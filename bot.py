@@ -1,12 +1,19 @@
-import logging
 import os
+import random
+import logging
+import threading
+import asyncio
+from datetime import datetime
+from flask import Flask, request, jsonify, send_file
+from flask_cors import CORS
+from sqlalchemy import func, or_
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import (
     Application, CommandHandler, ContextTypes, ConversationHandler,
     MessageHandler, CallbackQueryHandler, filters
 )
-from database import SessionLocal, User, TestResult, Question
-from datetime import datetime
+from database import SessionLocal, User, TestResult, Question, UserAnswer
 
 logging.basicConfig(level=logging.INFO)
 
@@ -16,17 +23,15 @@ if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN o'rnatilmagan!")
 
 ADMIN_IDS = [int(i.strip()) for i in os.environ.get('ADMIN_ID', '5690099705,6106446622').split(',') if i.strip()]
-ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.railway.app")
 
-# -------------------- HOLATLAR --------------------
-ASK_TEXT, ASK_A, ASK_B, ASK_C, ASK_D, ASK_CORRECT = range(6)
-EDIT_TEXT, EDIT_A, EDIT_B, EDIT_C, EDIT_D, EDIT_CORRECT = range(6, 12)
+app = Flask(__name__)
+CORS(app)
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
-# -------------------- START --------------------
+# -------------------- TELEGRAM BOT --------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     username = update.effective_user.username
@@ -38,13 +43,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = User(user_id=user_id, username=username, full_name=full_name)
         db.add(user)
     else:
-        # Username va ism o'zgargan bo'lsa yangilaymiz
         user.username = username
         user.full_name = full_name
     db.commit()
 
     buttons = [[InlineKeyboardButton("📝 Testni ochish", web_app=WebAppInfo(url=WEBAPP_URL))]]
-    
     if is_admin(user_id):
         buttons.append([InlineKeyboardButton("⚙️ Admin Panel", callback_data="admin_panel")])
 
@@ -58,19 +61,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     db.close()
 
-# -------------------- ADMIN PANEL MENUSI --------------------
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id if update.effective_user else update.callback_query.from_user.id
     if not is_admin(user_id):
         return
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ Savol qo'shish", callback_data="btn_add_q")],
-        [InlineKeyboardButton("📋 Savollar ro'yxati", callback_data="btn_list_q")],
         [InlineKeyboardButton("📊 Baza statistikasi", callback_data="btn_stats_q")],
         [InlineKeyboardButton("🎁 Test berish qo'llanmasi", callback_data="btn_grant_info")]
     ])
-
     text = "🛠 **Admin Boshqaruv Paneli**\n\nKerakli bo'limni tanlang:"
     
     if update.callback_query:
@@ -79,216 +78,236 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
-# -------------------- CALLBACK QUERY HANDLER --------------------
 async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    data = query.data
-    user_id = query.from_user.id
-
-    if not is_admin(user_id):
+    if not is_admin(query.from_user.id):
         return
 
-    if data == "admin_panel":
+    if query.data == "admin_panel":
         await admin_panel(update, context)
-
-    elif data == "btn_list_q":
-        await list_questions_callback(query)
-
-    elif data == "btn_stats_q":
+    elif query.data == "btn_stats_q":
         db = SessionLocal()
         q_count = db.query(Question).count()
         u_count = db.query(User).count()
         r_count = db.query(TestResult).count()
         db.close()
-        
         msg = f"📊 **Statistika:**\n\n👥 Foydalanuvchilar: {u_count} ta\n❓ Savollar: {q_count} ta\n📝 Yechilgan testlar: {r_count} ta"
         back_btn = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Orqaga", callback_data="admin_panel")]])
         await query.message.edit_text(msg, reply_markup=back_btn, parse_mode="Markdown")
-
-    elif data == "btn_grant_info":
-        msg = "🎁 **Foydalanuvchiga test berish:**\n\nBuyruq shakli:\n`/grant @username 5`\nyoki ID orqali:\n`/grant 12345678 5`"
+    elif query.data == "btn_grant_info":
+        msg = "🎁 **Foydalanuvchiga test berish:**\n\nBuyruq shakli:\n`/grant @username 5`\nyoki ID bo'yicha:\n`/grant 12345678 5`"
         back_btn = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Orqaga", callback_data="admin_panel")]])
         await query.message.edit_text(msg, reply_markup=back_btn, parse_mode="Markdown")
 
-    elif data.startswith("del_q_"):
-        q_id = int(data.split("_")[2])
-        db = SessionLocal()
-        q = db.query(Question).filter_by(id=q_id).first()
-        if q:
-            db.delete(q)
-            db.commit()
-            await query.message.edit_text(f"✅ ID #{q_id} savoli o'chirildi!")
-        else:
-            await query.message.edit_text("❌ Savol topilmadi.")
-        db.close()
-
-# -------------------- SAVOLLAR RO'YXATI (BUTTONS) --------------------
-async def list_questions_callback(query):
-    db = SessionLocal()
-    questions = db.query(Question).order_by(Question.id.desc()).limit(15).all()
-    db.close()
-
-    if not questions:
-        back_btn = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Orqaga", callback_data="admin_panel")]])
-        await query.message.edit_text("📭 Bazada hech qanday savol topilmadi.", reply_markup=back_btn)
-        return
-
-    msg = "📋 **So'nggi savollar ro'yxati:**\n\n"
-    buttons = []
-    for q in questions:
-        msg += f"🆔 **{q.id}**: {q.text[:35]}... (To'g'ri: {q.correct_answer})\n"
-        buttons.append([
-            InlineKeyboardButton(f"✏️ #{q.id} Tahrirlash", callback_data=f"edit_info_{q.id}"),
-            InlineKeyboardButton(f"🗑 #{q.id} O'chirish", callback_data=f"del_q_{q.id}")
-        ])
-
-    buttons.append([InlineKeyboardButton("⬅️ Orqaga", callback_data="admin_panel")])
-    await query.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
-
-# -------------------- SAVOL QO'SHISH (CONVERSATION) --------------------
-async def add_question_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    if query:
-        await query.answer()
-        user_id = query.from_user.id
-        message_func = query.message.reply_text
-    else:
-        user_id = update.effective_user.id
-        message_func = update.message.reply_text
-
-    if not is_admin(user_id):
-        return ConversationHandler.END
-
-    await message_func("📝 **Yangi savol matnini yozing:**", parse_mode="Markdown")
-    return ASK_TEXT
-
-async def ask_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['text'] = update.message.text
-    await update.message.reply_text("✏️ **Variant A:**", parse_mode="Markdown")
-    return ASK_A
-
-async def ask_a(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['option_a'] = update.message.text
-    await update.message.reply_text("✏️ **Variant B:**", parse_mode="Markdown")
-    return ASK_B
-
-async def ask_b(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['option_b'] = update.message.text
-    await update.message.reply_text("✏️ **Variant C:**", parse_mode="Markdown")
-    return ASK_C
-
-async def ask_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['option_c'] = update.message.text
-    await update.message.reply_text("✏️ **Variant D:**", parse_mode="Markdown")
-    return ASK_D
-
-async def ask_d(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['option_d'] = update.message.text
-    
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("A", callback_data="ans_A"), InlineKeyboardButton("B", callback_data="ans_B")],
-        [InlineKeyboardButton("C", callback_data="ans_C"), InlineKeyboardButton("D", callback_data="ans_D")]
-    ])
-    await update.message.reply_text("✅ **To'g'ri variantni tanlang:**", reply_markup=keyboard, parse_mode="Markdown")
-    return ASK_CORRECT
-
-async def ask_correct_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    correct = query.data.replace("ans_", "")
-
-    db = SessionLocal()
-    q = Question(
-        text=context.user_data['text'],
-        option_a=context.user_data['option_a'],
-        option_b=context.user_data['option_b'],
-        option_c=context.user_data['option_c'],
-        option_d=context.user_data['option_d'],
-        correct_answer=correct
-    )
-    db.add(q)
-    db.commit()
-    db.close()
-
-    back_btn = InlineKeyboardMarkup([[InlineKeyboardButton("⚙️ Admin Panel", callback_data="admin_panel")]])
-    await query.message.edit_text(f"✅ Savol muvaffaqiyatli qo'shildi! (To'g'ri javob: {correct})", reply_markup=back_btn)
-    context.user_data.clear()
-    return ConversationHandler.END
-
-# -------------------- TAHRIRLASH QO'LLANMA --------------------
-async def edit_info_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    q_id = query.data.split("_")[2]
-    await query.message.reply_text(f"✏️ Tahrirlash uchun `/update_question {q_id}` buyrug'ini yuboring.", parse_mode="Markdown")
-
-# -------------------- GRANT COMMAND (TUZATILDI) --------------------
 async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
     args = context.args
     if len(args) < 1:
-        await update.message.reply_text("❗️ Ishlatish: `/grant @username [son]`", parse_mode="Markdown")
+        await update.message.reply_text("❗️ Ishlatish:\n`/grant @username 5` yoki `/grant 12345678 5`", parse_mode="Markdown")
         return
-    
-    target = args[0].replace("@", "").strip()
+
+    raw_target = args[0].strip()
+    clean_target = raw_target.replace("@", "").strip()
     count = int(args[1]) if len(args) >= 2 and args[1].isdigit() else 1
+
+    db = SessionLocal()
+    try:
+        if clean_target.isdigit():
+            user = db.query(User).filter(User.user_id == int(clean_target)).first()
+        else:
+            user = db.query(User).filter(
+                or_(
+                    func.lower(User.username) == clean_target.lower(),
+                    func.lower(User.username) == f"@{clean_target.lower()}"
+                )
+            ).first()
+
+        if not user:
+            await update.message.reply_text(f"❌ Foydalanuvchi (`{raw_target}`) topilmadi.", parse_mode="Markdown")
+            return
+
+        user.tests_remaining += count
+        user.access_granted_at = datetime.now()
+        db.commit()
+
+        display_name = f"@{user.username}" if user.username else f"ID: {user.user_id}"
+        await update.message.reply_text(f"✅ {display_name} ga {count} ta test berildi!\n📊 Jami testlari: {user.tests_remaining}")
+    finally:
+        db.close()
+
+# -------------------- FLASK API ENDPOINTLAR (WebApp Uchun) --------------------
+@app.route('/')
+def index():
+    return send_file('static/index.html')
+
+@app.route('/static/<path:path>')
+def static_files(path):
+    return send_file(os.path.join('static', path))
+
+@app.route('/api/user/profile')
+def user_profile():
+    user_id = request.args.get('user_id', type=int)
+    if not user_id:
+        return jsonify({"error": "user_id kerak"}), 400
     
     db = SessionLocal()
-    # ID yoki Username bo'yicha izlash (katta-kichik harfga qaraysiz)
-    if target.isdigit():
-        user = db.query(User).filter_by(user_id=int(target)).first()
-    else:
-        user = db.query(User).filter(User.username.ilike(target)).first()
+    try:
+        user = db.query(User).filter_by(user_id=user_id).first()
+        if not user:
+            user = User(user_id=user_id, username="", full_name="Foydalanuvchi")
+            db.add(user)
+            db.commit()
         
-    if not user:
-        await update.message.reply_text("❌ Foydalanuvchi topilmadi")
+        results_count = db.query(TestResult).filter_by(user_id=user_id).count()
+        last = db.query(TestResult).filter_by(user_id=user_id).order_by(TestResult.completed_at.desc()).first()
+        
+        return jsonify({
+            "user_id": user.user_id,
+            "username": user.username,
+            "full_name": user.full_name,
+            "tests_remaining": user.tests_remaining,
+            "total_tests_taken": results_count,
+            "last_result": {
+                "correct": last.correct_answers,
+                "wrong": last.wrong_answers,
+                "percentage": last.percentage,
+                "date": last.completed_at.strftime('%d.%m.%Y %H:%M')
+            } if last else None
+        })
+    finally:
         db.close()
-        return
-        
-    user.tests_remaining += count
-    user.access_granted_at = datetime.now()
-    db.commit()
+
+@app.route('/api/user/results')
+def user_results():
+    user_id = request.args.get('user_id', type=int)
+    if not user_id:
+        return jsonify({"error": "user_id kerak"}), 400
     
-    display_name = f"@{user.username}" if user.username else f"ID: {user.user_id}"
-    await update.message.reply_text(f"✅ {display_name} ga {count} ta test berildi!")
-    db.close()
+    db = SessionLocal()
+    try:
+        results = db.query(TestResult).filter_by(user_id=user_id).order_by(TestResult.completed_at.desc()).all()
+        data = [{
+            "id": r.id,
+            "total": r.total_questions,
+            "correct": r.correct_answers,
+            "wrong": r.wrong_answers,
+            "percentage": r.percentage,
+            "date": r.completed_at.strftime('%d.%m.%Y %H:%M')
+        } for r in results]
+        return jsonify(data)
+    finally:
+        db.close()
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❌ Bekor qilindi")
-    context.user_data.clear()
-    return ConversationHandler.END
+@app.route('/api/init')
+def init_test():
+    user_id = request.args.get('user_id', type=int)
+    if not user_id:
+        return jsonify({"error": "user_id kerak"}), 400
+    
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter_by(user_id=user_id).first()
+        if not user or user.tests_remaining <= 0:
+            return jsonify({"error": "Sizda test huquqi yo'q"}), 403
+        
+        questions = db.query(Question).all()
+        if not questions:
+            return jsonify({"error": "Bazada hali savollar mavjud emas!"}), 400
+        
+        sample_size = min(len(questions), 30)
+        selected = random.sample(questions, sample_size)
+        
+        db.query(UserAnswer).filter_by(user_id=user_id).delete()
+        db.commit()
+        
+        result = []
+        for q in selected:
+            ua = UserAnswer(user_id=user_id, question_id=q.id, selected_option=None, is_correct=None)
+            db.add(ua)
+            result.append({
+                "id": q.id,
+                "text": q.text,
+                "options": [q.option_a, q.option_b, q.option_c, q.option_d],
+                "selected": None
+            })
+        db.commit()
+        return jsonify({"questions": result})
+    finally:
+        db.close()
 
-# -------------------- MAIN --------------------
-def main():
-    app = Application.builder().token(BOT_TOKEN).build()
+@app.route('/api/save', methods=['POST'])
+def save_answer():
+    data = request.json or {}
+    user_id = data.get('user_id')
+    question_id = data.get('question_id')
+    selected_option = data.get('selected_option')
+    
+    db = SessionLocal()
+    try:
+        ua = db.query(UserAnswer).filter_by(user_id=user_id, question_id=question_id).first()
+        if not ua:
+            return jsonify({"error": "Savol topilmadi"}), 404
+        
+        q = db.query(Question).filter_by(id=question_id).first()
+        is_correct = (selected_option == q.correct_answer)
+        ua.selected_option = selected_option
+        ua.is_correct = is_correct
+        ua.updated_at = datetime.now()
+        db.commit()
+        return jsonify({"status": "ok"})
+    finally:
+        db.close()
 
-    add_conv = ConversationHandler(
-        entry_points=[
-            CommandHandler("add_question", add_question_start),
-            CallbackQueryHandler(add_question_start, pattern="^btn_add_q$")
-        ],
-        states={
-            ASK_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_text)],
-            ASK_A: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_a)],
-            ASK_B: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_b)],
-            ASK_C: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_c)],
-            ASK_D: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_d)],
-            ASK_CORRECT: [CallbackQueryHandler(ask_correct_button, pattern="^ans_")],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-        allow_reentry=True
-    )
+@app.route('/api/finish', methods=['POST'])
+def finish_test():
+    data = request.json or {}
+    user_id = data.get('user_id')
+    
+    db = SessionLocal()
+    try:
+        answers = db.query(UserAnswer).filter_by(user_id=user_id).all()
+        total = len(answers)
+        correct = sum(1 for a in answers if a.is_correct is True)
+        wrong = sum(1 for a in answers if a.is_correct is False)
+        percentage = int((correct / total) * 100) if total > 0 else 0
+        
+        result = TestResult(
+            user_id=user_id,
+            total_questions=total,
+            correct_answers=correct,
+            wrong_answers=wrong,
+            percentage=percentage
+        )
+        db.add(result)
+        
+        user = db.query(User).filter_by(user_id=user_id).first()
+        if user and user.tests_remaining > 0:
+            user.tests_remaining -= 1
+            
+        db.commit()
+        return jsonify({"status": "ok", "correct": correct, "wrong": wrong, "percentage": percentage})
+    finally:
+        db.close()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("admin", admin_panel))
-    app.add_handler(CommandHandler("grant", grant))
-    app.add_handler(add_conv)
-    app.add_handler(CallbackQueryHandler(edit_info_callback, pattern="^edit_info_"))
-    app.add_handler(CallbackQueryHandler(admin_callback_handler))
+# -------------------- BOTNI FONDA ISHGA TUSHIRISH --------------------
+def run_telegram_bot():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    application = Application.builder().token(BOT_TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("admin", admin_panel))
+    application.add_handler(CommandHandler("grant", grant))
+    application.add_handler(CallbackQueryHandler(admin_callback_handler))
+    
+    application.run_polling(drop_pending_updates=True)
 
-    app.run_polling()
+# Bot va WebApp ni parallel ishlatish
+bot_thread = threading.Thread(target=run_telegram_bot, daemon=True)
+bot_thread.start()
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)

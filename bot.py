@@ -2,7 +2,7 @@ import logging
 import asyncio
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, ContextTypes, ConversationHandler
+from telegram.ext import Application, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters
 from database import SessionLocal, User, TestResult, Question
 from datetime import datetime
 
@@ -159,18 +159,35 @@ async def plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, reply_markup=keyboard)
 
 # -------------------- ASOSIY FUNKSIYA (ASINXRON!) --------------------
-# -------------------- ASOSIY FUNKSIYA --------------------
-def main():
+async def main():
     app = Application.builder().token(BOT_TOKEN).build()
     conv = ConversationHandler(
         entry_points=[CommandHandler("add_question", add_question_start)],
         states={
-            ASK_TEXT: [CommandHandler("cancel", cancel)],
-            ASK_A: [CommandHandler("cancel", cancel)],
-            ASK_B: [CommandHandler("cancel", cancel)],
-            ASK_C: [CommandHandler("cancel", cancel)],
-            ASK_D: [CommandHandler("cancel", cancel)],
-            ASK_CORRECT: [CommandHandler("cancel", cancel)],
+            ASK_TEXT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ask_text),
+                CommandHandler("cancel", cancel)
+            ],
+            ASK_A: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ask_a),
+                CommandHandler("cancel", cancel)
+            ],
+            ASK_B: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ask_b),
+                CommandHandler("cancel", cancel)
+            ],
+            ASK_C: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ask_c),
+                CommandHandler("cancel", cancel)
+            ],
+            ASK_D: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ask_d),
+                CommandHandler("cancel", cancel)
+            ],
+            ASK_CORRECT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ask_correct),
+                CommandHandler("cancel", cancel)
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
@@ -179,10 +196,8 @@ def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-
-    # run_polling sinxron ishlaydi
-    app.run_polling()
+    await app.run_polling()
 
 # -------------------- ISHGA TUSHIRISH --------------------
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

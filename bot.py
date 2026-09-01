@@ -182,7 +182,7 @@ async def main():
 
 # -------------------- ISHGA TUSHIRISH (YANGI EVENT LOOP) --------------------
 if __name__ == "__main__":
-    # ✅ Yangi event loop yaratamiz (asyncio.run() ishlatilmaydi!)
+    # ✅ asyncio.run() YO'Q! Yangi event loop yaratamiz
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:

@@ -178,12 +178,11 @@ async def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-    # ✅ stop_signals YO'Q – oddiy run_polling
     await app.run_polling()
 
 # -------------------- ISHGA TUSHIRISH (YANGI EVENT LOOP) --------------------
 if __name__ == "__main__":
-    # ✅ Yangi event loop yaratamiz (asyncio.run() xatolik berishining oldini olish uchun)
+    # ✅ Yangi event loop yaratamiz (asyncio.run() ishlatilmaydi!)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:

@@ -1,12 +1,14 @@
 import logging
 import asyncio
 import os
+import sys
+import traceback
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes, ConversationHandler
 from database import SessionLocal, User, TestResult, Question
 from datetime import datetime
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
 # -------------------- ENVIRONMENT VARIABLES --------------------
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
@@ -178,8 +180,13 @@ async def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-    # ✅ Oddiy run_polling, signal handler YO'Q
+    # Signal handler o'chirilgan, oddiy polling
     await app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        logging.error("Bot ishga tushmadi: %s", e)
+        traceback.print_exc()
+        sys.exit(1)

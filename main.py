@@ -7,7 +7,7 @@ import os
 import threading
 import subprocess
 import time
-
+import sys
 # -------------------- KONFIGURATSIYA --------------------
 BOT_TOKEN = os.environ.get('BOT_TOKEN', "8840031160:AAFFVOrr_aK0LBGPYX2lAEBkcmkpMDauXKY")
 ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
@@ -19,24 +19,33 @@ CORS(app)
 
 # -------------------- BOTNI ALOHIDA JARAYONDA ISHGA TUSHIRISH --------------------
 def run_bot():
-    """Botni alohida subprocess sifatida ishga tushiradi (event loop muammosiz)"""
+    """Botni alohida subprocess sifatida ishga tushiradi, xatoliklarni logga chiqaradi"""
     time.sleep(3)
     try:
-        subprocess.Popen(
-            ["python", "bot.py"],
+        # Botni ishga tushirish va stdout/stderr ni real vaqtda logga chiqarish
+        process = subprocess.Popen(
+            [sys.executable, "bot.py"],
             env=os.environ,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            text=True
         )
-        print("✅ Bot jarayoni ishga tushirildi (subprocess)")
+        # stdout va stderr ni real vaqtda chiqarish
+        for line in process.stdout:
+            print(f"BOT: {line.strip()}")
+        for line in process.stderr:
+            print(f"BOT ERROR: {line.strip()}")
+        process.wait()
+        print(f"✅ Bot jarayoni tugadi (exit code: {process.returncode})")
     except Exception as e:
         print(f"❌ Bot ishga tushmadi: {e}")
+        import traceback
+        traceback.print_exc()
 
 # Botni thread orqali ishga tushirish
 bot_thread = threading.Thread(target=run_bot, daemon=True)
 bot_thread.start()
 print("✅ Bot thread ishga tushirildi")
-
 # -------------------- STATIC FAYLLAR --------------------
 @app.route('/')
 def index():

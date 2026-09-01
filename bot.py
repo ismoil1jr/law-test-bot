@@ -95,15 +95,15 @@ async def list_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📭 Bazada hech qanday savol topilmadi.")
         return
 
-    msg = "📋 **Baza savollari ro'yxati:**\n\n"
+    msg = "📋 Baza savollari ro'yxati:\n\n"
     for q in questions[:20]:
-        msg += f"🆔 **{q.id}**: {q.text[:40]}... (To'g'ri: {q.correct_answer})\n"
+        msg += f"🆔 {q.id}: {q.text[:40]}... (To'g'ri: {q.correct_answer})\n"
 
-    msg += f"\n📊 Jami savollar: **{len(questions)}** ta"
-    msg += "\n✏️ Tahrirlash: `/update_question ID`"
-    msg += "\n🗑 O'chirish: `/delete_question ID`"
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    msg += f"\n📊 Jami savollar: {len(questions)} ta"
+    msg += "\n✏️ Tahrirlash: /update_question ID"
+    msg += "\n🗑 O'chirish: /delete_question ID"
 
+    await update.message.reply_text(msg)
 # -------------------- ADMIN: SAVOLNI O'CHIRISH --------------------
 async def delete_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:

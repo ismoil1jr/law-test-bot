@@ -17,26 +17,31 @@ WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.ra
 app = Flask(__name__)
 CORS(app)
 
+
 # -------------------- BOTNI ALOHIDA JARAYONDA ISHGA TUSHIRISH --------------------
+def log_output(pipe, prefix):
+    for line in iter(pipe.readline, ''):
+        if line.strip():
+            print(f"{prefix}: {line.rstrip()}")
+
 def run_bot():
-    """Botni subprocess sifatida ishga tushiradi va xatoliklarni logga chiqaradi"""
-    time.sleep(3)
+    time.sleep(2)
     try:
-        result = subprocess.run(
+        p = subprocess.Popen(
             ["python", "bot.py"],
             env=os.environ,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=10  # 10 soniyadan ko‘p ishlasa, to‘xtatish (sinov uchun)
+            bufsize=1
         )
-        if result.returncode != 0:
-            print(f"❌ Bot xatolik bilan chiqdi (code {result.returncode})")
-            print(f"STDERR: {result.stderr}")
-            print(f"STDOUT: {result.stdout}")
-        else:
-            print("✅ Bot muvaffaqiyatli ishga tushdi va tugadi")
-    except subprocess.TimeoutExpired:
-        print("✅ Bot ishlab turibdi (timeout) – bu normal holat")
+        print("✅ Bot jarayoni ishga tushirildi (Popen)")
+        # Output o'qish uchun threadlar
+        threading.Thread(target=log_output, args=(p.stdout, "BOT"), daemon=True).start()
+        threading.Thread(target=log_output, args=(p.stderr, "BOT ERR"), daemon=True).start()
+        # Jarayon tugashini kutish (lekin bloklamaslik uchun)
+        p.wait()
+        print("⚠️ Bot jarayoni tugadi")
     except Exception as e:
         print(f"❌ Bot ishga tushmadi: {e}")
 

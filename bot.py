@@ -158,8 +158,8 @@ async def plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await update.message.reply_text(text, reply_markup=keyboard)
 
-# -------------------- ASOSIY FUNKSIYA --------------------
-def main():
+# -------------------- ASOSIY FUNKSIYA (ASINXRON!) --------------------
+async def main():
     app = Application.builder().token(BOT_TOKEN).build()
     conv = ConversationHandler(
         entry_points=[CommandHandler("add_question", add_question_start)],
@@ -178,10 +178,8 @@ def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-
-    # run_polling sinxron ishlatiladi
-    app.run_polling()
+    await app.run_polling()
 
 # -------------------- ISHGA TUSHIRISH --------------------
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

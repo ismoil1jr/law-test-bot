@@ -1,23 +1,22 @@
-// -------------------- Telegram WebApp dan user_id olish --------------------
+// -------------------- Telegram WebApp dan user ma'lumotlarini olish --------------------
 let userId = null;
 let photoUrl = '';
+let tgUser = null;
 
-// 1-usul: Telegram WebApp API (asosiy)
 if (window.Telegram && window.Telegram.WebApp) {
     const webApp = window.Telegram.WebApp;
-    webApp.ready(); // WebApp tayyorligini bildirish
+    webApp.ready();
     
     if (webApp.initDataUnsafe && webApp.initDataUnsafe.user) {
-        const user = webApp.initDataUnsafe.user;
-        userId = user.id;
-        // Telegram avatar URL ni bermaydi, lekin zaxira
-        if (user.photo_url) {
-            photoUrl = user.photo_url;
+        tgUser = webApp.initDataUnsafe.user;
+        userId = tgUser.id;
+        if (tgUser.photo_url) {
+            photoUrl = tgUser.photo_url;
         }
     }
 }
 
-// 2-usul: URL parametrlaridan olish (zaxira, brauzerda sinash uchun)
+// Brauzerda sinash uchun zaxira (URL param)
 if (!userId) {
     const urlParams = new URLSearchParams(window.location.search);
     const urlUserId = urlParams.get('user_id');
@@ -27,13 +26,12 @@ if (!userId) {
     photoUrl = urlParams.get('photo') || '';
 }
 
-// Agar hali ham userId bo'lmasa, xatolik
 if (!userId) {
     alert('❌ Foydalanuvchi ID topilmadi! Iltimos, bot orqali qayta urinib ko‘ring.');
     throw new Error('No user_id found');
 }
 
-// -------------------- Qolgan kod --------------------
+// -------------------- O'ZGARUVCHILAR --------------------
 let questions = [];
 let currentIndex = 0;
 let answers = {};
@@ -281,7 +279,7 @@ async function loadResults() {
         const data = await res.json();
         const container = document.getElementById('resultsList');
         
-        if (data.length === 0) {
+        if (!data || data.length === 0) {
             container.innerHTML = '<p style="color:rgba(255,255,255,0.5);"><i class="fas fa-inbox"></i> Hali natija yo\'q.</p>';
             return;
         }
@@ -299,34 +297,46 @@ async function loadResults() {
     }
 }
 
-// -------------------- PROFIL --------------------
+// -------------------- PROFIL (TUZATILDI) --------------------
 async function loadProfile() {
+    // 1. Dastlab Telegram WebApp ma'lumotlarini darhol chiqaramiz
+    let fullName = tgUser ? `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() : "Noma'lum";
+    let username = tgUser && tgUser.username ? `@${tgUser.username}` : "-";
+
+    document.getElementById('profileName').textContent = fullName || "Noma'lum";
+    document.getElementById('profileUsername').textContent = username;
+
+    // Avatar
+    const avatarContainer = document.querySelector('.profile-avatar');
+    if (photoUrl) {
+        avatarContainer.innerHTML = `<img src="${photoUrl}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;" />`;
+    } else {
+        avatarContainer.innerHTML = `<i class="fas fa-user-circle" style="font-size:56px; color:rgba(255,255,255,0.3);"></i>`;
+    }
+
+    // 2. Serverdan qolgan statistikani yuklaymiz
     try {
         const res = await fetch(`/api/user/profile?user_id=${userId}`);
-        const data = await res.json();
-        
-        document.getElementById('profileName').textContent = data.full_name || 'Noma\'lum';
-        document.getElementById('profileUsername').textContent = data.username || '-';
-        document.getElementById('profileRemaining').textContent = data.tests_remaining || 0;
-        document.getElementById('profileTotal').textContent = data.total_tests_taken || 0;
-        
-        // Avatar
-        const avatarContainer = document.querySelector('.profile-avatar');
-        if (photoUrl) {
-            avatarContainer.innerHTML = `<img src="${photoUrl}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;" />`;
-        } else {
-            avatarContainer.innerHTML = `<i class="fas fa-user-circle" style="font-size:56px; color:rgba(255,255,255,0.3);"></i>`;
-        }
-        
-        // Oxirgi natija
-        if (data.last_result) {
-            document.getElementById('lastCorrect').textContent = data.last_result.correct;
-            document.getElementById('lastWrong').textContent = data.last_result.wrong;
-            document.getElementById('lastPercent').textContent = data.last_result.percentage;
-            document.getElementById('lastDate').textContent = data.last_result.date;
-        } else {
-            document.getElementById('lastResultBox').innerHTML = 
-                '<p style="color:rgba(255,255,255,0.4);"><i class="fas fa-info-circle"></i> Hali natija yo\'q</p>';
+        if (res.ok) {
+            const data = await res.json();
+            
+            // Serverda ism/username bo'lsa, ularni ham yangilab qo'yamiz
+            if (data.full_name) document.getElementById('profileName').textContent = data.full_name;
+            if (data.username) document.getElementById('profileUsername').textContent = `@${data.username.replace('@','')}`;
+            
+            document.getElementById('profileRemaining').textContent = data.tests_remaining || 0;
+            document.getElementById('profileTotal').textContent = data.total_tests_taken || 0;
+            
+            // Oxirgi natija
+            if (data.last_result) {
+                document.getElementById('lastCorrect').textContent = data.last_result.correct;
+                document.getElementById('lastWrong').textContent = data.last_result.wrong;
+                document.getElementById('lastPercent').textContent = data.last_result.percentage;
+                document.getElementById('lastDate').textContent = data.last_result.date;
+            } else {
+                document.getElementById('lastResultBox').innerHTML = 
+                    '<p style="color:rgba(255,255,255,0.4);"><i class="fas fa-info-circle"></i> Hali natija yo\'q</p>';
+            }
         }
     } catch (e) {
         console.error('Profilni yuklashda xatolik:', e);

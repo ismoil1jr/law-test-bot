@@ -37,11 +37,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         user = User(user_id=user_id, username=username, full_name=full_name)
         db.add(user)
-        db.commit()
+    else:
+        # Username va ism o'zgargan bo'lsa yangilaymiz
+        user.username = username
+        user.full_name = full_name
+    db.commit()
 
     buttons = [[InlineKeyboardButton("📝 Testni ochish", web_app=WebAppInfo(url=WEBAPP_URL))]]
     
-    # Faqat adminga ko'rinadigan tugma
     if is_admin(user_id):
         buttons.append([InlineKeyboardButton("⚙️ Admin Panel", callback_data="admin_panel")])
 
@@ -183,7 +186,6 @@ async def ask_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ask_d(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['option_d'] = update.message.text
     
-    # Variant tanlash uchun tugmalar
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("A", callback_data="ans_A"), InlineKeyboardButton("B", callback_data="ans_B")],
         [InlineKeyboardButton("C", callback_data="ans_C"), InlineKeyboardButton("D", callback_data="ans_D")]
@@ -221,7 +223,7 @@ async def edit_info_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     q_id = query.data.split("_")[2]
     await query.message.reply_text(f"✏️ Tahrirlash uchun `/update_question {q_id}` buyrug'ini yuboring.", parse_mode="Markdown")
 
-# -------------------- OTHER COMMANDS --------------------
+# -------------------- GRANT COMMAND (TUZATILDI) --------------------
 async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
@@ -229,19 +231,28 @@ async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(args) < 1:
         await update.message.reply_text("❗️ Ishlatish: `/grant @username [son]`", parse_mode="Markdown")
         return
-    target = args[0].replace("@", "")
+    
+    target = args[0].replace("@", "").strip()
     count = int(args[1]) if len(args) >= 2 and args[1].isdigit() else 1
     
     db = SessionLocal()
-    user = db.query(User).filter_by(user_id=int(target)).first() if target.isdigit() else db.query(User).filter_by(username=target).first()
+    # ID yoki Username bo'yicha izlash (katta-kichik harfga qaraysiz)
+    if target.isdigit():
+        user = db.query(User).filter_by(user_id=int(target)).first()
+    else:
+        user = db.query(User).filter(User.username.ilike(target)).first()
+        
     if not user:
         await update.message.reply_text("❌ Foydalanuvchi topilmadi")
         db.close()
         return
+        
     user.tests_remaining += count
     user.access_granted_at = datetime.now()
     db.commit()
-    await update.message.reply_text(f"✅ @{user.username or user.user_id} ga {count} ta test berildi!")
+    
+    display_name = f"@{user.username}" if user.username else f"ID: {user.user_id}"
+    await update.message.reply_text(f"✅ {display_name} ga {count} ta test berildi!")
     db.close()
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):

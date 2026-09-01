@@ -160,8 +160,7 @@ async def plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------------------- ASOSIY FUNKSIYA --------------------
 async def main():
-    # ✅ Signal handler ni o'chirish (threadda ishlash uchun)
-    app = Application.builder().token(BOT_TOKEN).signal_handlers(False).build()
+    app = Application.builder().token(BOT_TOKEN).build()
     conv = ConversationHandler(
         entry_points=[CommandHandler("add_question", add_question_start)],
         states={
@@ -179,8 +178,8 @@ async def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-    # ✅ Endi signal handler o'chirilgan, shuning uchun run_polling() oddiy ishlaydi
-    await app.run_polling()
+    # ✅ Signal handlerlarni o'chirish (threadda ishlash uchun)
+    await app.run_polling(stop_signals=[])
 
 # -------------------- ISHGA TUSHIRISH (FAQAT MUSTAQIL ISHLATISH UCHUN) --------------------
 if __name__ == "__main__":

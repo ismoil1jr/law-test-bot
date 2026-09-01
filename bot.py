@@ -8,7 +8,6 @@ from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 
-# -------------------- ENVIRONMENT VARIABLES --------------------
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN environment variable is not set!")
@@ -17,10 +16,8 @@ ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.railway.app")
 
-# -------------------- HOLATLAR --------------------
 ASK_TEXT, ASK_A, ASK_B, ASK_C, ASK_D, ASK_CORRECT = range(6)
 
-# -------------------- START --------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     username = update.effective_user.username
@@ -47,7 +44,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     db.close()
 
-# -------------------- ADMIN: GRANT --------------------
 async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ Siz admin emassiz!")
@@ -79,7 +75,6 @@ async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ @{user.username} ga {count} ta test berildi! (Jami: {user.tests_remaining})")
     db.close()
 
-# -------------------- ADMIN: SAVOL QO'SHISH --------------------
 async def add_question_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ Faqat admin!")
@@ -138,7 +133,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     return ConversationHandler.END
 
-# -------------------- STATUS --------------------
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     db = SessionLocal()
@@ -150,7 +144,6 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📊 Qolgan testlar: {user.tests_remaining}")
     db.close()
 
-# -------------------- PLANS --------------------
 async def plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "📦 Paketlar:\n5 ta – 5000 so'm\n10 ta – 10000 so'm\n15 ta – 13500 so'm"
     keyboard = InlineKeyboardMarkup([
@@ -158,7 +151,6 @@ async def plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await update.message.reply_text(text, reply_markup=keyboard)
 
-# -------------------- ASOSIY FUNKSIYA --------------------
 async def main():
     app = Application.builder().token(BOT_TOKEN).build()
     conv = ConversationHandler(
@@ -178,9 +170,8 @@ async def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-    # ✅ Signal handlerlarni o'chirish (threadda ishlash uchun)
-    await app.run_polling(stop_signals=[])
+    # Oddiy run_polling, stop_signals YO'Q
+    await app.run_polling()
 
-# -------------------- ISHGA TUSHIRISH (FAQAT MUSTAQIL ISHLATISH UCHUN) --------------------
 if __name__ == "__main__":
     asyncio.run(main())

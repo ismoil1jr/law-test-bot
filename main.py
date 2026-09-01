@@ -22,7 +22,6 @@ def run_bot():
     """Botni alohida subprocess sifatida ishga tushiradi (event loop muammosiz)"""
     time.sleep(3)
     try:
-        # Botni alohida jarayonda ishga tushirish, environment variables ni uzatish
         subprocess.Popen(
             ["python", "bot.py"],
             env=os.environ,
@@ -33,7 +32,7 @@ def run_bot():
     except Exception as e:
         print(f"❌ Bot ishga tushmadi: {e}")
 
-# Botni thread orqali ishga tushirish (daemon=true)
+# Botni thread orqali ishga tushirish
 bot_thread = threading.Thread(target=run_bot, daemon=True)
 bot_thread.start()
 print("✅ Bot thread ishga tushirildi")
@@ -202,4 +201,4 @@ def finish_test():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=False) 

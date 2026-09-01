@@ -190,6 +190,7 @@ def main():
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
+        allow_reentry=True  # <-- Jarayonni istalgan payt qayta boshlashga ruxsat beradi
     )
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("grant", grant))
@@ -197,7 +198,6 @@ def main():
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
 
-    # run_polling oddiy sinxron chaqiriladi
     app.run_polling()
 
 # -------------------- ISHGA TUSHIRISH --------------------

@@ -7,16 +7,15 @@ Base = declarative_base()
 engine = create_engine("sqlite:///huquq.db", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
 
-from sqlalchemy import Column, Integer, String, BigInteger
-from database import Base
-
+# ✅ USER modeli (bot.py dagi bilan mos)
 class User(Base):
     __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    telegram_id = Column(BigInteger, unique=True, nullable=True, index=True)
-    username = Column(String, unique=True, nullable=True, index=True)
-    tests_limit = Column(Integer, default=5)  # Odatiy qiymat: 5 ta test
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, unique=True, nullable=False)   # ✅ Telegram user ID
+    username = Column(String, nullable=True)
+    full_name = Column(String, nullable=True)
+    tests_remaining = Column(Integer, default=0)             # ✅ Qolgan testlar
+    access_granted_at = Column(DateTime, nullable=True)
 
 class Question(Base):
     __tablename__ = "questions"
@@ -47,4 +46,6 @@ class TestResult(Base):
     percentage = Column(Integer, default=0)
     completed_at = Column(DateTime, default=datetime.now)
 
+# ✅ Bazani yaratish
 Base.metadata.create_all(engine)
+print("✅ Baza muvaffaqiyatli yaratildi!")

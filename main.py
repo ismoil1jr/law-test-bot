@@ -4,6 +4,9 @@ from datetime import datetime
 from database import SessionLocal, User, Question, UserAnswer, TestResult
 import random
 import os
+import threading
+import asyncio
+import time
 
 # -------------------- KONFIGURATSIYA --------------------
 BOT_TOKEN = os.environ.get('BOT_TOKEN', "8840031160:AAFFVOrr_aK0LBGPYX2lAEBkcmkpMDauXKY")
@@ -13,6 +16,25 @@ WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.ra
 
 app = Flask(__name__)
 CORS(app)
+app = Flask(__name__)
+CORS(app)
+def run_bot():
+    time.sleep(2)
+    try:
+        # ✅ Yangi event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        import bot
+        loop.run_until_complete(bot.main())
+        loop.close()
+        print("✅ Bot ishga tushdi va ishlayapti")
+    except Exception as e:
+        print(f"❌ Bot ishga tushmadi: {e}")
+
+# Botni thread orqali ishga tushirish
+threading.Thread(target=run_bot, daemon=True).start()
+print("✅ Bot thread ishga tushirildi")
+
 
 # -------------------- STATIC FAYLLAR --------------------
 @app.route('/')
@@ -175,6 +197,7 @@ def finish_test():
         "percentage": percentage,
         "details": details
     })
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))

@@ -9,8 +9,7 @@ import subprocess
 import time
 
 # -------------------- KONFIGURATSIYA --------------------
-# Environment variables dan o'qish (Render da sozlangan)
-BOT_TOKEN = os.environ.get('BOT_TOKEN', "your_token_here")
+BOT_TOKEN = os.environ.get('BOT_TOKEN', "8601999347:AAExWrIJa_rMMa1gFg43LXz8cm6Y1yBpHoY")
 ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://huquq-test-bot.up.railway.app")
@@ -20,9 +19,11 @@ CORS(app)
 
 # -------------------- BOTNI THREAD DA ISHGA TUSHIRISH --------------------
 def run_bot():
+    """Botni alohida processda ishga tushiradi (Railway uchun)"""
     time.sleep(3)
     try:
-        subprocess.run(["python", "bot.py"], check=False)
+        # ✅ Environment variables ni o'tkazish (MUHIM!)
+        subprocess.run(["python", "bot.py"], env=os.environ, check=False)
     except Exception as e:
         print(f"Bot ishga tushmadi: {e}")
 
@@ -30,7 +31,6 @@ def run_bot():
 bot_thread = threading.Thread(target=run_bot, daemon=True)
 bot_thread.start()
 print("✅ Bot thread ishga tushirildi")
-
 
 # -------------------- STATIC FAYLLAR --------------------
 @app.route('/')
@@ -194,9 +194,6 @@ def finish_test():
         "details": details
     })
 
-# -------------------- GUNICORN UCHUN --------------------
-# 'app' obyekti gunicorn tomonidan ishlatiladi
-# -------------------- LOKAL ISHGA TUSHIRISH --------------------
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
     app.run(host='0.0.0.0', port=port, debug=False)

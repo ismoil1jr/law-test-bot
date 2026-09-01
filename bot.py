@@ -1,15 +1,21 @@
 import logging
 import asyncio
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes, ConversationHandler
 from database import SessionLocal, User, TestResult, Question
 from datetime import datetime
-import os
-BOT_TOKEN = os.environ.get('8840031160:AAFFVOrr_aK0LBGPYX2lAEBkcmkpMDauXKY')
+
+logging.basicConfig(level=logging.INFO)
+
+# -------------------- ENVIRONMENT VARIABLES (config fayli YO'Q!) --------------------
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
+if not BOT_TOKEN:
+    raise ValueError("❌ BOT_TOKEN environment variable is not set! Railway da qo'shing!")
+
 ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://huquq-test-bot.up.railway.app")
-logging.basicConfig(level=logging.INFO)
 
 # -------------------- HOLATLAR --------------------
 ASK_TEXT, ASK_A, ASK_B, ASK_C, ASK_D, ASK_CORRECT = range(6)

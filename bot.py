@@ -180,9 +180,8 @@ async def main():
     app.add_handler(conv)
     await app.run_polling()
 
-# -------------------- ISHGA TUSHIRISH (YANGI EVENT LOOP) --------------------
+# -------------------- ✅ ISHGA TUSHIRISH (asyncio.run YO'Q) --------------------
 if __name__ == "__main__":
-    # ✅ asyncio.run() YO'Q! Yangi event loop yaratamiz
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:

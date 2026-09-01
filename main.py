@@ -14,7 +14,7 @@ WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.ra
 app = Flask(__name__)
 CORS(app)
 
-# ❌ Bot import va thread YO'Q!
+# ❌ Bot import YO'Q!
 
 # -------------------- STATIC --------------------
 @app.route('/')
@@ -84,7 +84,7 @@ def init_test():
     questions = db.query(Question).all()
     if len(questions) < 30:
         db.close()
-        return jsonify({"error": f"Hali 30 ta savol qo'shilmagan! (hozir {len(questions)})"}), 400
+        return jsonify({"error": f"Hali 30 ta savol qo'shilmagan!"}), 400
     selected = random.sample(questions, 30)
     db.query(UserAnswer).filter_by(user_id=user_id).delete()
     db.commit()

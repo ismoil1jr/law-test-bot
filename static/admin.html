@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin panel - Huquqiy Test</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="adminApp">
+        <header style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+            <div class="header-left">
+                <span class="logo">🔐 Admin Panel</span>
+            </div>
+            <div class="header-right">
+                <span id="adminStatus">Admin: <span id="adminUserId">-</span></span>
+            </div>
+        </header>
+
+        <main>
+            <section id="adminSection">
+                <h2>Savollarni boshqarish</h2>
+
+                <!-- Form -->
+                <div class="admin-form">
+                    <h3>Yangi savol qo‘shish</h3>
+                    <input type="text" id="qText" placeholder="Savol matni" required>
+                    <input type="text" id="qA" placeholder="Variant A" required>
+                    <input type="text" id="qB" placeholder="Variant B" required>
+                    <input type="text" id="qC" placeholder="Variant C" required>
+                    <input type="text" id="qD" placeholder="Variant D" required>
+                    <select id="qCorrect">
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="D">D</option>
+                    </select>
+                    <button id="addQuestionBtn">➕ Qo‘shish</button>
+                </div>
+
+                <!-- List -->
+                <div id="questionList">
+                    <h3>Mavjud savollar</h3>
+                    <ul id="questionItems"></ul>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script>
+        // Admin panel JS - oddiy
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('user_id');
+        if (!userId) {
+            document.body.innerHTML = '<p style="color:red;text-align:center;margin-top:50px;">Iltimos, user_id parametrini kiriting.</p>';
+            throw new Error('No user_id');
+        }
+        document.getElementById('adminUserId').textContent = userId;
+
+        // API chaqiruvlari
+        const BASE = '/api/admin/questions';
+
+        async function loadQuestions() {
+            const res = await fetch(`${BASE}?user_id=${userId}`);
+            const data = await res.json();
+            if (res.ok) {
+                const list = document.getElementById('questionItems');
+                list.innerHTML = '';
+                data.forEach(q => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <strong>${q.text}</strong><br>
+                        A) ${q.options[0]} | B) ${q.options[1]} | C) ${q.options[2]} | D) ${q.options[3]}<br>
+                        To‘g‘ri: ${q.correct_answer}
+                        <button onclick="deleteQuestion(${q.id})">🗑 O‘chirish</button>
+                    `;
+                    list.appendChild(li);
+                });
+            } else {
+                alert('Xatolik: ' + data.error);
+            }
+        }
+
+        async function deleteQuestion(id) {
+            if (!confirm('Savolni o‘chirmoqchimisiz?')) return;
+            const res = await fetch(`${BASE}?user_id=${userId}&id=${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                loadQuestions();
+            } else {
+                alert('O‘chirishda xatolik');
+            }
+        }
+
+        document.getElementById('addQuestionBtn').onclick = async () => {
+            const text = document.getElementById('qText').value.trim();
+            const option_a = document.getElementById('qA').value.trim();
+            const option_b = document.getElementById('qB').value.trim();
+            const option_c = document.getElementById('qC').value.trim();
+            const option_d = document.getElementById('qD').value.trim();
+            const correct_answer = document.getElementById('qCorrect').value;
+            if (!text || !option_a || !option_b || !option_c || !option_d) {
+                alert('Barcha maydonlarni to‘ldiring!');
+                return;
+            }
+            const res = await fetch(`${BASE}?user_id=${userId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ text, option_a, option_b, option_c, option_d, correct_answer })
+            });
+            if (res.ok) {
+                alert('Savol qo‘shildi!');
+                document.getElementById('qText').value = '';
+                document.getElementById('qA').value = '';
+                document.getElementById('qB').value = '';
+                document.getElementById('qC').value = '';
+                document.getElementById('qD').value = '';
+                loadQuestions();
+            } else {
+                const err = await res.json();
+                alert('Xatolik: ' + err.error);
+            }
+        };
+
+        loadQuestions();
+    </script>
+</body>
+</html>

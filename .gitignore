@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+huquq_bot/
+huquq_bot2/
+.venv/
+
+# Database (muhim!)
+huquq.db
+*.db
+
+# Config (tokenni o‘z ichiga oladi!) – JUDA MUHIM!
+config.py
+
+# Ngrok
+ngrok.exe
+ngrok.yml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

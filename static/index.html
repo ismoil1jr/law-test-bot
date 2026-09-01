@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
+    <title>Huquqiy Test</title>
+    <!-- Font Awesome 6 (bepul) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header>
+            <div class="header-left">
+                <i class="fas fa-gavel logo-icon"></i>
+                <span class="logo">HUQUQ.TEST</span>
+            </div>
+            <div class="header-right">
+                <span id="timer" style="display:none;"><i class="fas fa-clock"></i> <span id="timerText">15:00</span></span>
+                <button id="finishBtn" style="display:none;" class="finish-btn"><i class="fas fa-flag-checkered"></i> Tugatish</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main id="mainContent">
+            <!-- HOME -->
+            <section id="home" class="page active">
+                <div class="glass-card home-card">
+                    <h2><i class="fas fa-house"></i> Bosh sahifa</h2>
+                    <div class="stats-grid">
+                        <div class="stat-box glass">
+                            <span class="stat-label"><i class="fas fa-vial"></i> Qolgan testlar</span>
+                            <span class="stat-value" id="homeTests">0</span>
+                        </div>
+                        <div class="stat-box glass">
+                            <span class="stat-label"><i class="fas fa-chart-simple"></i> Jami testlar</span>
+                            <span class="stat-value" id="homeTotal">0</span>
+                        </div>
+                    </div>
+                    <button id="startTestBtn" class="start-btn glass-btn"><i class="fas fa-play"></i> Testni boshlash</button>
+                    <p id="noTestsMsg" style="display:none; color:#ff6b6b;"><i class="fas fa-exclamation-circle"></i> Sizda test huquqi yo'q</p>
+                </div>
+            </section>
+
+            <!-- TEST -->
+            <section id="test" class="page" style="display:none;">
+                <div class="test-progress">
+                    <span id="questionCounter"><i class="fas fa-question-circle"></i> Savol 1/30</span>
+                    <span id="answeredCounter"><i class="fas fa-check-circle"></i> Javob: 0/30</span>
+                </div>
+                <div class="glass-card question-card">
+                    <p id="questionText">Savol matni</p>
+                    <div id="optionsContainer"></div>
+                </div>
+                <div class="nav-buttons">
+                    <button id="prevBtn" class="nav-btn glass-btn"><i class="fas fa-chevron-left"></i> Oldingi</button>
+                    <button id="nextBtn" class="nav-btn glass-btn">Keyingi <i class="fas fa-chevron-right"></i></button>
+                </div>
+            </section>
+
+            <!-- RESULTS -->
+            <section id="results" class="page" style="display:none;">
+                <h2><i class="fas fa-chart-bar"></i> Natijalar tarixi</h2>
+                <div id="resultsList"></div>
+            </section>
+
+            <!-- PROFILE -->
+            <section id="profile" class="page" style="display:none;">
+                <h2><i class="fas fa-user-circle"></i> Profil</h2>
+                <div class="glass-card profile-card">
+                    <div class="profile-avatar glass">
+                        <img id="profileAvatar" src="" alt="Avatar" />
+                    </div>
+                    <p><i class="fas fa-user"></i> <strong>Ism:</strong> <span id="profileName">-</span></p>
+                    <p><i class="fas fa-at"></i> <strong>Username:</strong> <span id="profileUsername">-</span></p>
+                    <p><i class="fas fa-vial"></i> <strong>Qolgan testlar:</strong> <span id="profileRemaining">0</span></p>
+                    <p><i class="fas fa-chart-simple"></i> <strong>Jami testlar:</strong> <span id="profileTotal">0</span></p>
+                    <hr />
+                    <h4><i class="fas fa-flag"></i> Oxirgi natija</h4>
+                    <div id="lastResultBox">
+                        <p><i class="fas fa-check-circle" style="color:#34c759;"></i> To'g'ri: <span id="lastCorrect">-</span></p>
+                        <p><i class="fas fa-times-circle" style="color:#ff4757;"></i> Noto'g'ri: <span id="lastWrong">-</span></p>
+                        <p><i class="fas fa-percent"></i> Foiz: <span id="lastPercent">-</span>%</p>
+                        <p><i class="fas fa-calendar"></i> Sana: <span id="lastDate">-</span></p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Bottom Menu (iOS style) -->
+        <footer class="bottom-menu glass">
+            <div class="menu-item active" data-page="home">
+                <i class="fas fa-house"></i>
+                <span>Bosh</span>
+            </div>
+            <div class="menu-item" data-page="test">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Test</span>
+            </div>
+            <div class="menu-item" data-page="results">
+                <i class="fas fa-chart-bar"></i>
+                <span>Natijalar</span>
+            </div>
+            <div class="menu-item" data-page="profile">
+                <i class="fas fa-user-circle"></i>
+                <span>Profil</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modal -->
+    <div id="finishModal" class="modal" style="display:none;">
+        <div class="modal-content glass">
+            <h3><i class="fas fa-triangle-exclamation"></i> Testni tugatmoqchimisiz?</h3>
+            <div class="modal-stats glass">
+                <p><i class="fas fa-check-circle" style="color:#34c759;"></i> Javob berilgan: <span id="modalAnswered">0</span></p>
+                <p><i class="fas fa-circle-xmark" style="color:#ff4757;"></i> Javob berilmagan: <span id="modalUnanswered">0</span></p>
+            </div>
+            <div class="modal-buttons">
+                <button id="cancelFinish" class="modal-btn cancel glass-btn"><i class="fas fa-arrow-left"></i> Orqaga</button>
+                <button id="confirmFinish" class="modal-btn confirm glass-btn"><i class="fas fa-check"></i> Ha, tugat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

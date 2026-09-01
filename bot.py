@@ -287,7 +287,25 @@ def finish_test():
             user.tests_remaining -= 1
             
         db.commit()
-        return jsonify({"status": "ok", "correct": correct, "wrong": wrong, "percentage": percentage})
+        
+        details = []
+        for a in answers:
+            q = db.query(Question).filter_by(id=a.question_id).first()
+            if q:
+                details.append({
+                    "question": q.text,
+                    "your_answer": a.selected_option,
+                    "correct_answer": q.correct_answer,
+                    "is_correct": a.is_correct
+                })
+        return jsonify({
+            "status": "ok",
+            "total": total,
+            "correct": correct,
+            "wrong": wrong,
+            "percentage": percentage,
+            "details": details
+        })
     finally:
         db.close()
 
@@ -302,7 +320,8 @@ def run_telegram_bot():
     application.add_handler(CommandHandler("grant", grant))
     application.add_handler(CallbackQueryHandler(admin_callback_handler))
     
-    application.run_polling(drop_pending_updates=True)
+    # stop_signals=None parametri background thread uchun shart!
+    application.run_polling(drop_pending_updates=True, stop_signals=None)
 
 # Bot va WebApp ni parallel ishlatish
 bot_thread = threading.Thread(target=run_telegram_bot, daemon=True)

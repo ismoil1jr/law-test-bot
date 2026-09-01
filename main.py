@@ -5,8 +5,18 @@ from database import SessionLocal, User, Question, UserAnswer, TestResult
 import random
 import os
 import threading
-import subprocess
+import asyncio
 import time
+import traceback
+
+# -------------------- KONFIGURATSIYA --------------------
+BOT_TOKEN = os.environ.get('BOT_TOKEN', "8840031160:AAFFVOrr_aK0LBGPYX2lAEBkcmkpMDauXKY")
+ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
+WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.railway.app")
+
+app = Flask(__name__)
+CORS(app)
 
 # -------------------- KONFIGURATSIYA --------------------
 BOT_TOKEN = os.environ.get('BOT_TOKEN', "8840031160:AAFFVOrr_aK0LBGPYX2lAEBkcmkpMDauXKY")
@@ -19,19 +29,23 @@ CORS(app)
 
 # -------------------- BOTNI THREAD DA ISHGA TUSHIRISH --------------------
 def run_bot():
-    """Botni alohida processda ishga tushiradi (Railway uchun)"""
+    """Botni alohida threadda va yangi event loopda ishga tushiradi"""
     time.sleep(3)
     try:
-        # ✅ Environment variables ni o'tkazish (MUHIM!)
-        subprocess.run(["python", "bot.py"], env=os.environ, check=False)
-        print("✅ Bot process tugadi")
+        # ✅ Yangi event loop yaratamiz
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        import bot
+        loop.run_until_complete(bot.main())
+        print("✅ Bot ishga tushdi va ishlayapti")
     except Exception as e:
         print(f"❌ Bot ishga tushmadi: {e}")
+        traceback.print_exc()
 
-# ✅ Har doim ishga tushirish (RENDER sharti YO'Q!)
+# ✅ Botni har doim ishga tushirish (RENDER sharti YO'Q!)
 bot_thread = threading.Thread(target=run_bot, daemon=True)
 bot_thread.start()
-print("✅ Bot thread ishga tushirildi (subprocess)")
+print("✅ Bot thread ishga tushirildi (yangi event loop)")
 
 # -------------------- STATIC FAYLLAR --------------------
 @app.route('/')
@@ -41,6 +55,7 @@ def index():
 @app.route('/static/<path:path>')
 def static_files(path):
     return send_file(os.path.join('static', path))
+
 
 # -------------------- USER PROFILE --------------------
 @app.route('/api/user/profile')

@@ -8,10 +8,10 @@ from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 
-# -------------------- ENVIRONMENT VARIABLES (config fayli YO'Q!) --------------------
+# -------------------- ENVIRONMENT VARIABLES --------------------
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 if not BOT_TOKEN:
-    raise ValueError("❌ BOT_TOKEN environment variable is not set! Railway da qo'shing!")
+    raise ValueError("❌ BOT_TOKEN environment variable is not set!")
 
 ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
@@ -158,7 +158,7 @@ async def plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await update.message.reply_text(text, reply_markup=keyboard)
 
-# -------------------- ASOSIY --------------------
+# -------------------- ASOSIY FUNKSIYA (faqat main) --------------------
 async def main():
     app = Application.builder().token(BOT_TOKEN).build()
     conv = ConversationHandler(
@@ -180,5 +180,7 @@ async def main():
     app.add_handler(conv)
     await app.run_polling()
 
+# -------------------- ISHGA TUSHIRISH (FAQAT MUSTAQIL ISHLATISH UCHUN) --------------------
+# Bu qism Railway da main.py orqali chaqirilganda ishga tushmaydi
 if __name__ == "__main__":
     asyncio.run(main())

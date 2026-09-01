@@ -8,14 +8,14 @@ from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 
-# -------------------- ENVIRONMENT VARIABLES --------------------
+# -------------------- ENVIRONMENT VARIABLES (config fayli YO'Q!) --------------------
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 if not BOT_TOKEN:
-    raise ValueError("❌ BOT_TOKEN environment variable is not set!")
+    raise ValueError("❌ BOT_TOKEN environment variable is not set! Railway da qo'shing!")
 
 ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
-WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://huquq-test-bot.up.railway.app")
+WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.railway.app")
 
 # -------------------- HOLATLAR --------------------
 ASK_TEXT, ASK_A, ASK_B, ASK_C, ASK_D, ASK_CORRECT = range(6)
@@ -158,7 +158,7 @@ async def plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await update.message.reply_text(text, reply_markup=keyboard)
 
-# -------------------- ASOSIY FUNKSIYA --------------------
+# -------------------- ASOSIY --------------------
 async def main():
     app = Application.builder().token(BOT_TOKEN).build()
     conv = ConversationHandler(
@@ -180,8 +180,5 @@ async def main():
     app.add_handler(conv)
     await app.run_polling()
 
-# -------------------- ISHGA TUSHIRISH --------------------
 if __name__ == "__main__":
-    # Bu qism faqat mustaqil ishga tushirishda ishlatiladi
-    # Railway da main.py orqali chaqiriladi
     asyncio.run(main())

@@ -1,5 +1,4 @@
 import logging
-import asyncio
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters
@@ -13,7 +12,8 @@ BOT_TOKEN = os.environ.get('BOT_TOKEN')
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN environment variable is not set!")
 
-ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
+# Bir nechta admin ID'larni qabul qilish
+ADMIN_IDS = [int(i.strip()) for i in os.environ.get('ADMIN_ID', '5690099705,6106446622').split(',') if i.strip()]
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.railway.app")
 
@@ -49,7 +49,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------------------- ADMIN: GRANT --------------------
 async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if update.effective_user.id not in ADMIN_IDS:
         await update.message.reply_text("❌ Siz admin emassiz!")
         return
     args = context.args
@@ -81,7 +81,7 @@ async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------------------- ADMIN: SAVOL QO'SHISH --------------------
 async def add_question_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if update.effective_user.id not in ADMIN_IDS:
         await update.message.reply_text("❌ Faqat admin!")
         return ConversationHandler.END
     await update.message.reply_text("📝 Savol matnini yozing:")
@@ -154,12 +154,12 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "📦 Paketlar:\n5 ta – 5000 so'm\n10 ta – 10000 so'm\n15 ta – 13500 so'm"
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💬 Admin", url=f"https://t.me/{ADMIN_USERNAME}")]
+        [InlineKeyboardButton("💬 Admin", url=f"https://t.me/{ADMIN_USERNAME.split(',')[0]}")]
     ])
     await update.message.reply_text(text, reply_markup=keyboard)
 
-# -------------------- ASOSIY FUNKSIYA (ASINXRON!) --------------------
-async def main():
+# -------------------- ASOSIY FUNKSIYA --------------------
+def main():
     app = Application.builder().token(BOT_TOKEN).build()
     conv = ConversationHandler(
         entry_points=[CommandHandler("add_question", add_question_start)],
@@ -196,8 +196,10 @@ async def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-    await app.run_polling()
+
+    # run_polling oddiy sinxron chaqiriladi
+    app.run_polling()
 
 # -------------------- ISHGA TUSHIRISH --------------------
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

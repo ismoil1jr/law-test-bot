@@ -178,8 +178,8 @@ async def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-    await app.run_polling()
-
+    # ✅ Signal handler ni o'chirish (threadda ishlash uchun)
+    await app.run_polling(handle_signals=False)
 # -------------------- ISHGA TUSHIRISH (FAQAT MUSTAQIL ISHLATISH UCHUN) --------------------
 # Bu qism Railway da main.py orqali chaqirilganda ishga tushmaydi
 if __name__ == "__main__":

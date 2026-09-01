@@ -5,11 +5,11 @@ from database import SessionLocal, User, Question, UserAnswer, TestResult
 import random
 import os
 import threading
-import subprocess
+import asyncio
 import time
 
 # -------------------- KONFIGURATSIYA --------------------
-BOT_TOKEN = os.environ.get('BOT_TOKEN', "8601999347:AAExWrIJa_rMMa1gFg43LXz8cm6Y1yBpHoY")
+BOT_TOKEN = os.environ.get('BOT_TOKEN', "your_token_here")
 ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://huquq-test-bot.up.railway.app")
@@ -17,20 +17,23 @@ WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://huquq-test-bot.up.railway.app
 app = Flask(__name__)
 CORS(app)
 
-# -------------------- BOTNI THREAD DA ISHGA TUSHIRISH --------------------
+# -------------------- BOTNI THREAD + ASYNCIO DA ISHGA TUSHIRISH --------------------
 def run_bot():
-    """Botni alohida processda ishga tushiradi (Railway uchun)"""
+    """Botni alohida threadda ishga tushiradi (Railway uchun)"""
     time.sleep(3)
     try:
-        # ✅ Environment variables ni o'tkazish (MUHIM!)
-        subprocess.run(["python", "bot.py"], env=os.environ, check=False)
+        import bot
+        # Yangi event loop yaratamiz (subprocess muammosini oldini olish uchun)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(bot.main())
     except Exception as e:
         print(f"Bot ishga tushmadi: {e}")
 
 # ✅ Botni har doim ishga tushirish (Railway, Render, local)
 bot_thread = threading.Thread(target=run_bot, daemon=True)
 bot_thread.start()
-print("✅ Bot thread ishga tushirildi")
+print("✅ Bot thread ishga tushirildi (asyncio)")
 
 # -------------------- STATIC FAYLLAR --------------------
 @app.route('/')

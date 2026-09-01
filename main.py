@@ -6,12 +6,15 @@ import random
 import os
 
 # -------------------- KONFIGURATSIYA --------------------
+BOT_TOKEN = os.environ.get('BOT_TOKEN', "8840031160:AAFFVOrr_aK0LBGPYX2lAEBkcmkpMDauXKY")
 ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.railway.app")
 
 app = Flask(__name__)
 CORS(app)
+
+# ❌ Bot import va thread YO'Q!
 
 # -------------------- STATIC FAYLLAR --------------------
 @app.route('/')

@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# Botni background da ishga tushirish
-python bot.py &
+echo "🚀 Starting bot..."
+python -u bot.py &
 
-# Flask serverni ishga tushirish
+echo "🚀 Starting Flask server..."
 gunicorn main:app -b 0.0.0.0:8000

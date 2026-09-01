@@ -13,7 +13,7 @@ import time
 BOT_TOKEN = os.environ.get('BOT_TOKEN', "your_token_here")
 ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
-WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot.onrender.com")
+WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://huquq-test-bot.up.railway.app")
 
 app = Flask(__name__)
 CORS(app)
@@ -32,6 +32,7 @@ if os.environ.get('RENDER'):
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
     print("✅ Bot thread ishga tushirildi")
+
 
 # -------------------- STATIC FAYLLAR --------------------
 @app.route('/')

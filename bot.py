@@ -159,7 +159,7 @@ async def plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, reply_markup=keyboard)
 
 # -------------------- ASOSIY FUNKSIYA --------------------
-async def main():
+def main():
     app = Application.builder().token(BOT_TOKEN).build()
     conv = ConversationHandler(
         entry_points=[CommandHandler("add_question", add_question_start)],
@@ -178,13 +178,10 @@ async def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-    await app.run_polling()
 
-# -------------------- ✅ ISHGA TUSHIRISH (asyncio.run YO'Q) --------------------
+    # run_polling sinxron ishlatiladi
+    app.run_polling()
+
+# -------------------- ISHGA TUSHIRISH --------------------
 if __name__ == "__main__":
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(main())
-    finally:
-        loop.close()
+    main()

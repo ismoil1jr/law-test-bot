@@ -178,8 +178,6 @@ async def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-    # ✅ stop_signals YO'Q, oddiy run_polling
-    await app.run_polling()
+    await app.run_polling(stop_signals=[])
 
-# ✅ 'if __name__ == "__main__"' qismi YO'Q!
-# Bot main.py dan import qilib ishga tushiriladi
+# ✅ 'if __name__ == "__main__"' YO'Q!

@@ -15,13 +15,10 @@ ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.railway.app")
 
 app = Flask(__name__)
-CORS(app)
-app = Flask(__name__)
-CORS(app)
+CORS(app)   # ✅ Bir marta
 def run_bot():
     time.sleep(2)
     try:
-        # ✅ Yangi event loop
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         import bot

@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Flask va botni bir vaqtda ishga tushirish uchun start.sh ishlatamiz
+# start.sh ni ishga tushirish
 COPY start.sh .
 RUN chmod +x start.sh
 

@@ -178,7 +178,6 @@ async def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-    # Oddiy run_polling, hech qanday qo'shimcha parametr YO'Q
     await app.run_polling()
 
 if __name__ == "__main__":

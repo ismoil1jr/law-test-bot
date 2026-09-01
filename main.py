@@ -4,9 +4,6 @@ from datetime import datetime
 from database import SessionLocal, User, Question, UserAnswer, TestResult
 import random
 import os
-import threading
-import subprocess
-import time
 
 # -------------------- KONFIGURATSIYA --------------------
 BOT_TOKEN = os.environ.get('BOT_TOKEN', "8840031160:AAFFVOrr_aK0LBGPYX2lAEBkcmkpMDauXKY")
@@ -17,44 +14,7 @@ WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.ra
 app = Flask(__name__)
 CORS(app)
 
-
-# -------------------- BOTNI ALOHIDA JARAYONDA ISHGA TUSHIRISH --------------------
-def run_bot():
-    time.sleep(3)
-    try:
-        # Botni alohida jarayonda ishga tushirish (asyncio muammosiz)
-        cmd = [
-            "python", "-c",
-            "import asyncio, bot; asyncio.run(bot.main())"
-        ]
-        p = subprocess.Popen(
-            cmd,
-            env=os.environ,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1
-        )
-        print("✅ Bot jarayoni ishga tushirildi (python -c)")
-
-        # Stdout va stderr ni logga chiqarish
-        def read_pipe(pipe, prefix):
-            for line in iter(pipe.readline, ''):
-                if line.strip():
-                    print(f"{prefix}: {line.rstrip()}")
-
-        threading.Thread(target=read_pipe, args=(p.stdout, "BOT"), daemon=True).start()
-        threading.Thread(target=read_pipe, args=(p.stderr, "BOT ERR"), daemon=True).start()
-
-        p.wait()
-        print("⚠️ Bot jarayoni tugadi")
-    except Exception as e:
-        print(f"❌ Bot ishga tushmadi: {e}")
-
-# Botni thread orqali ishga tushirish
-threading.Thread(target=run_bot, daemon=True).start()
-print("✅ Bot thread ishga tushirildi")
-    # -------------------- STATIC FAYLLAR --------------------
+# -------------------- STATIC FAYLLAR --------------------
 @app.route('/')
 def index():
     return send_file('static/index.html')
@@ -62,7 +22,6 @@ def index():
 @app.route('/static/<path:path>')
 def static_files(path):
     return send_file(os.path.join('static', path))
-
 
 # -------------------- USER PROFILE --------------------
 @app.route('/api/user/profile')

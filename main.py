@@ -4,12 +4,37 @@ from datetime import datetime
 from database import SessionLocal, User, Question, UserAnswer, TestResult
 import random
 import os
-from config import ADMIN_ID
+import threading
+import subprocess
+import time
 
+# -------------------- KONFIGURATSIYA --------------------
+# Environment variables dan o'qish (Render da sozlangan)
+BOT_TOKEN = os.environ.get('BOT_TOKEN', "your_token_here")
+ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
+WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot.onrender.com")
 
 app = Flask(__name__)
 CORS(app)
 
+# -------------------- BOTNI THREAD DA ISHGA TUSHIRISH --------------------
+def run_bot():
+    """Botni alohida processda ishga tushiradi (Render uchun)"""
+    time.sleep(3)  # Flask server tayyor bo'lishi uchun
+    try:
+        # bot.py ni ishga tushiramiz
+        subprocess.run(["python", "bot.py"], check=False)
+    except Exception as e:
+        print(f"Bot ishga tushmadi: {e}")
+
+# Faqat Render muhitida ishga tushirish (lokalde sinovda ishlamasligi uchun)
+if os.environ.get('RENDER'):
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+    print("✅ Bot thread ishga tushirildi")
+
+# -------------------- STATIC FAYLLAR --------------------
 @app.route('/')
 def index():
     return send_file('static/index.html')
@@ -65,7 +90,7 @@ def user_results():
     db.close()
     return jsonify(data)
 
-# -------------------- INIT (YANGILANGAN!) --------------------
+# -------------------- TEST INIT --------------------
 @app.route('/api/init')
 def init_test():
     user_id = request.args.get('user_id', type=int)
@@ -78,22 +103,13 @@ def init_test():
         db.close()
         return jsonify({"error": "Sizda test huquqi yo'q"}), 403
 
-    # ❌ Eski noto'g'ri kod:
-    # old = db.query(TestResult).filter_by(user_id=user_id).first()
-    # if old:
-    #     db.close()
-    #     return jsonify({"status": "finished", "message": "Siz allaqachon test topshirgansiz!"})
-
-    # ✅ Yangi: faqat savollar yetarlimi tekshiramiz
     questions = db.query(Question).all()
     if len(questions) < 30:
         db.close()
         return jsonify({"error": f"Hali 30 ta savol qo'shilmagan! (hozir {len(questions)})"}), 400
 
-    # 30 ta tasodifiy savol tanlash
     selected = random.sample(questions, 30)
 
-    # Foydalanuvchining eski javoblarini o'chirish (agar mavjud bo'lsa)
     db.query(UserAnswer).filter_by(user_id=user_id).delete()
     db.commit()
 
@@ -110,7 +126,6 @@ def init_test():
     db.commit()
     db.close()
     return jsonify({"questions": result})
-
 
 # -------------------- SAVE ANSWER --------------------
 @app.route('/api/save', methods=['POST'])
@@ -136,7 +151,6 @@ def save_answer():
     return jsonify({"status": "ok"})
 
 # -------------------- FINISH TEST --------------------
-
 @app.route('/api/finish', methods=['POST'])
 def finish_test():
     data = request.json
@@ -182,5 +196,9 @@ def finish_test():
         "details": details
     })
 
+# -------------------- GUNICORN UCHUN --------------------
+# 'app' obyekti gunicorn tomonidan ishlatiladi
+# -------------------- LOKAL ISHGA TUSHIRISH --------------------
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port, debug=False)

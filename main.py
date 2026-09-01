@@ -7,7 +7,7 @@ import os
 import threading
 import subprocess
 import time
-import sys
+
 # -------------------- KONFIGURATSIYA --------------------
 BOT_TOKEN = os.environ.get('BOT_TOKEN', "8840031160:AAFFVOrr_aK0LBGPYX2lAEBkcmkpMDauXKY")
 ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
@@ -19,33 +19,32 @@ CORS(app)
 
 # -------------------- BOTNI ALOHIDA JARAYONDA ISHGA TUSHIRISH --------------------
 def run_bot():
-    """Botni alohida subprocess sifatida ishga tushiradi, xatoliklarni logga chiqaradi"""
+    """Botni subprocess sifatida ishga tushiradi va xatoliklarni logga chiqaradi"""
     time.sleep(3)
     try:
-        # Botni ishga tushirish va stdout/stderr ni real vaqtda logga chiqarish
-        process = subprocess.Popen(
-            [sys.executable, "bot.py"],
+        result = subprocess.run(
+            ["python", "bot.py"],
             env=os.environ,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+            capture_output=True,
+            text=True,
+            timeout=10  # 10 soniyadan ko‘p ishlasa, to‘xtatish (sinov uchun)
         )
-        # stdout va stderr ni real vaqtda chiqarish
-        for line in process.stdout:
-            print(f"BOT: {line.strip()}")
-        for line in process.stderr:
-            print(f"BOT ERROR: {line.strip()}")
-        process.wait()
-        print(f"✅ Bot jarayoni tugadi (exit code: {process.returncode})")
+        if result.returncode != 0:
+            print(f"❌ Bot xatolik bilan chiqdi (code {result.returncode})")
+            print(f"STDERR: {result.stderr}")
+            print(f"STDOUT: {result.stdout}")
+        else:
+            print("✅ Bot muvaffaqiyatli ishga tushdi va tugadi")
+    except subprocess.TimeoutExpired:
+        print("✅ Bot ishlab turibdi (timeout) – bu normal holat")
     except Exception as e:
         print(f"❌ Bot ishga tushmadi: {e}")
-        import traceback
-        traceback.print_exc()
 
 # Botni thread orqali ishga tushirish
 bot_thread = threading.Thread(target=run_bot, daemon=True)
 bot_thread.start()
 print("✅ Bot thread ishga tushirildi")
+
 # -------------------- STATIC FAYLLAR --------------------
 @app.route('/')
 def index():

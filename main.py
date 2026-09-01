@@ -23,7 +23,6 @@ def run_bot():
     """Botni alohida processda ishga tushiradi (Render uchun)"""
     time.sleep(3)  # Flask server tayyor bo'lishi uchun
     try:
-        # bot.py ni ishga tushiramiz
         subprocess.run(["python", "bot.py"], check=False)
     except Exception as e:
         print(f"Bot ishga tushmadi: {e}")

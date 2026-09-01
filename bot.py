@@ -12,7 +12,6 @@ BOT_TOKEN = os.environ.get('BOT_TOKEN')
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN environment variable is not set!")
 
-# Bir nechta admin ID'larni qabul qilish
 ADMIN_IDS = [int(i.strip()) for i in os.environ.get('ADMIN_ID', '5690099705,6106446622').split(',') if i.strip()]
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.railway.app")
@@ -78,6 +77,52 @@ async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.commit()
     await update.message.reply_text(f"✅ @{user.username} ga {count} ta test berildi! (Jami: {user.tests_remaining})")
     db.close()
+
+# -------------------- ADMIN: SAVOLLAR RO'YXATI --------------------
+async def list_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        await update.message.reply_text("❌ Faqat admin!")
+        return
+
+    db = SessionLocal()
+    questions = db.query(Question).all()
+    db.close()
+
+    if not questions:
+        await update.message.reply_text("📭 Bazada hech qanday savol topilmadi.")
+        return
+
+    msg = "📋 **Baza savollari ro'yxati:**\n\n"
+    for q in questions[:20]:  # Telegram xabar sig'imi cheklangani uchun 20 ta savol ko'rsatiladi
+        msg += f"🆔 **{q.id}**: {q.text[:40]}... (To'g'ri: {q.correct_answer})\n"
+
+    msg += f"\n📊 Jami savollar: **{len(questions)}** ta"
+    msg += "\n🗑 O'chirish uchun: `/delete_question ID`"
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+# -------------------- ADMIN: SAVOLNI O'CHIRISH --------------------
+async def delete_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        await update.message.reply_text("❌ Faqat admin!")
+        return
+
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("❗️ Ishlatish: `/delete_question ID` (masalan: `/delete_question 1`)", parse_mode="Markdown")
+        return
+
+    q_id = int(context.args[0])
+    db = SessionLocal()
+    q = db.query(Question).filter_by(id=q_id).first()
+
+    if not q:
+        await update.message.reply_text("❌ Bunday ID ga ega savol topilmadi.")
+        db.close()
+        return
+
+    db.delete(q)
+    db.commit()
+    db.close()
+    await update.message.reply_text(f"✅ ID #{q_id} bo'lgan savol o'chirildi!")
 
 # -------------------- ADMIN: SAVOL QO'SHISH --------------------
 async def add_question_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -190,16 +235,17 @@ def main():
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
-        allow_reentry=True  # <-- Jarayonni istalgan payt qayta boshlashga ruxsat beradi
+        allow_reentry=True
     )
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("grant", grant))
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
+    app.add_handler(CommandHandler("list", list_questions))
+    app.add_handler(CommandHandler("delete_question", delete_question))
     app.add_handler(conv)
 
     app.run_polling()
 
-# -------------------- ISHGA TUSHIRISH --------------------
 if __name__ == "__main__":
     main()

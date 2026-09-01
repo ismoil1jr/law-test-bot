@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: law-test-bot
+    runtime: image
+    repo: https://github.com/ismoil1jr/law-test-bot
+    branch: main
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: BOT_TOKEN
+        value: 8601999347:AAExWrIJa_rMMa1gFg43LXz8cm6Y1yBpHoY
+      - key: ADMIN_ID
+        value: 5690099705
+      - key: ADMIN_USERNAME
+        value: erkinvv17
+      - key: WEBAPP_URL
+        value: https://law-test-bot.onrender.com
+      - key: RENDER
+        value: true

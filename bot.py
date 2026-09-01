@@ -2,10 +2,13 @@ import logging
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes, ConversationHandler
-from config import BOT_TOKEN, ADMIN_ID, ADMIN_USERNAME, WEBAPP_URL
 from database import SessionLocal, User, TestResult, Question
 from datetime import datetime
-
+import os
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
+ADMIN_ID = int(os.environ.get('ADMIN_ID', 5690099705))
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
+WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://huquq-test-bot.up.railway.app")
 logging.basicConfig(level=logging.INFO)
 
 # -------------------- HOLATLAR --------------------

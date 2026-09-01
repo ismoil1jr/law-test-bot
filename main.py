@@ -20,18 +20,16 @@ CORS(app)
 
 # -------------------- BOTNI THREAD DA ISHGA TUSHIRISH --------------------
 def run_bot():
-    """Botni alohida processda ishga tushiradi (Render uchun)"""
-    time.sleep(3)  # Flask server tayyor bo'lishi uchun
+    time.sleep(3)
     try:
         subprocess.run(["python", "bot.py"], check=False)
     except Exception as e:
         print(f"Bot ishga tushmadi: {e}")
 
-# Faqat Render muhitida ishga tushirish (lokalde sinovda ishlamasligi uchun)
-if os.environ.get('RENDER'):
-    bot_thread = threading.Thread(target=run_bot, daemon=True)
-    bot_thread.start()
-    print("✅ Bot thread ishga tushirildi")
+# ✅ Botni har doim ishga tushirish (Railway, Render, local)
+bot_thread = threading.Thread(target=run_bot, daemon=True)
+bot_thread.start()
+print("✅ Bot thread ishga tushirildi")
 
 
 # -------------------- STATIC FAYLLAR --------------------

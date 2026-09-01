@@ -9,7 +9,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 
 # -------------------- ENVIRONMENT VARIABLES --------------------
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8840031160:AAFFVOrr_aK0LBGPYX2lAEBkcmkpMDauXKY')
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN environment variable is not set!")
 

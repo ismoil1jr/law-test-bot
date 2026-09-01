@@ -158,9 +158,10 @@ async def plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     await update.message.reply_text(text, reply_markup=keyboard)
 
-# -------------------- ASOSIY FUNKSIYA (faqat main) --------------------
+# -------------------- ASOSIY FUNKSIYA --------------------
 async def main():
-    app = Application.builder().token(BOT_TOKEN).build()
+    # ✅ Signal handler ni o'chirish (threadda ishlash uchun)
+    app = Application.builder().token(BOT_TOKEN).signal_handlers(False).build()
     conv = ConversationHandler(
         entry_points=[CommandHandler("add_question", add_question_start)],
         states={
@@ -178,9 +179,9 @@ async def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-    # ✅ Signal handler ni o'chirish (threadda ishlash uchun)
-    await app.run_polling(handle_signals=False)
+    # ✅ Endi signal handler o'chirilgan, shuning uchun run_polling() oddiy ishlaydi
+    await app.run_polling()
+
 # -------------------- ISHGA TUSHIRISH (FAQAT MUSTAQIL ISHLATISH UCHUN) --------------------
-# Bu qism Railway da main.py orqali chaqirilganda ishga tushmaydi
 if __name__ == "__main__":
     asyncio.run(main())

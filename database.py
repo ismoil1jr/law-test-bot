@@ -7,14 +7,16 @@ Base = declarative_base()
 engine = create_engine("sqlite:///huquq.db", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
 
+from sqlalchemy import Column, Integer, String, BigInteger
+from database import Base
+
 class User(Base):
     __tablename__ = "users"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, unique=True, nullable=False)
-    username = Column(String, nullable=True)
-    full_name = Column(String, nullable=True)
-    tests_remaining = Column(Integer, default=0)
-    access_granted_at = Column(DateTime, nullable=True)
+
+    id = Column(Integer, primary_key=True, index=True)
+    telegram_id = Column(BigInteger, unique=True, nullable=True, index=True)
+    username = Column(String, unique=True, nullable=True, index=True)
+    tests_limit = Column(Integer, default=5)  # Odatiy qiymat: 5 ta test
 
 class Question(Base):
     __tablename__ = "questions"

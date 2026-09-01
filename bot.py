@@ -180,7 +180,7 @@ def main():
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
 
-    # run_polling oddiy (sinxron) chaqiriladi, await va asyncio kerak emas
+    # run_polling sinxron ishlaydi
     app.run_polling()
 
 # -------------------- ISHGA TUSHIRISH --------------------

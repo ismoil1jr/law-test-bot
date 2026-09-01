@@ -1,5 +1,5 @@
 #!/bin/bash
-# Flask server va botni bir vaqtda ishga tushirish
+set -e
 
 # Botni background da ishga tushirish
 python bot.py &

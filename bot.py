@@ -180,4 +180,6 @@ async def main():
     app.add_handler(conv)
     await app.run_polling(stop_signals=[])
 
-# ✅ 'if __name__ == "__main__"' YO'Q!
+# -------------------- ISHGA TUSHIRISH --------------------
+if __name__ == "__main__":
+    asyncio.run(main())

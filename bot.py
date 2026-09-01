@@ -178,8 +178,8 @@ async def main():
     app.add_handler(CommandHandler("status", status))
     app.add_handler(CommandHandler("plans", plans))
     app.add_handler(conv)
-    # ✅ Signal handlerlarni o'chirish (agar qo'llab-quvvatlasa)
-    await app.run_polling(stop_signals=[])
+    # Oddiy run_polling, hech qanday qo'shimcha parametr YO'Q
+    await app.run_polling()
 
 if __name__ == "__main__":
     asyncio.run(main())

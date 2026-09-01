@@ -19,38 +19,42 @@ CORS(app)
 
 
 # -------------------- BOTNI ALOHIDA JARAYONDA ISHGA TUSHIRISH --------------------
-def log_output(pipe, prefix):
-    for line in iter(pipe.readline, ''):
-        if line.strip():
-            print(f"{prefix}: {line.rstrip()}")
-
 def run_bot():
-    time.sleep(2)
+    time.sleep(3)
     try:
+        # Botni alohida jarayonda ishga tushirish (asyncio muammosiz)
+        cmd = [
+            "python", "-c",
+            "import asyncio, bot; asyncio.run(bot.main())"
+        ]
         p = subprocess.Popen(
-            ["python", "bot.py"],
+            cmd,
             env=os.environ,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1
         )
-        print("✅ Bot jarayoni ishga tushirildi (Popen)")
-        # Output o'qish uchun threadlar
-        threading.Thread(target=log_output, args=(p.stdout, "BOT"), daemon=True).start()
-        threading.Thread(target=log_output, args=(p.stderr, "BOT ERR"), daemon=True).start()
-        # Jarayon tugashini kutish (lekin bloklamaslik uchun)
+        print("✅ Bot jarayoni ishga tushirildi (python -c)")
+
+        # Stdout va stderr ni logga chiqarish
+        def read_pipe(pipe, prefix):
+            for line in iter(pipe.readline, ''):
+                if line.strip():
+                    print(f"{prefix}: {line.rstrip()}")
+
+        threading.Thread(target=read_pipe, args=(p.stdout, "BOT"), daemon=True).start()
+        threading.Thread(target=read_pipe, args=(p.stderr, "BOT ERR"), daemon=True).start()
+
         p.wait()
         print("⚠️ Bot jarayoni tugadi")
     except Exception as e:
         print(f"❌ Bot ishga tushmadi: {e}")
 
 # Botni thread orqali ishga tushirish
-bot_thread = threading.Thread(target=run_bot, daemon=True)
-bot_thread.start()
+threading.Thread(target=run_bot, daemon=True).start()
 print("✅ Bot thread ishga tushirildi")
-
-# -------------------- STATIC FAYLLAR --------------------
+    # -------------------- STATIC FAYLLAR --------------------
 @app.route('/')
 def index():
     return send_file('static/index.html')
@@ -58,6 +62,7 @@ def index():
 @app.route('/static/<path:path>')
 def static_files(path):
     return send_file(os.path.join('static', path))
+
 
 # -------------------- USER PROFILE --------------------
 @app.route('/api/user/profile')

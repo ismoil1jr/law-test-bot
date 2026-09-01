@@ -1,26 +1,30 @@
 import logging
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters
+from telegram.ext import (
+    Application, CommandHandler, ContextTypes, ConversationHandler,
+    MessageHandler, CallbackQueryHandler, filters
+)
 from database import SessionLocal, User, TestResult, Question
 from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 
-# -------------------- ENVIRONMENT VARIABLES --------------------
+# -------------------- KONFIGURATSIYA --------------------
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 if not BOT_TOKEN:
-    raise ValueError("❌ BOT_TOKEN environment variable is not set!")
+    raise ValueError("❌ BOT_TOKEN o'rnatilmagan!")
 
 ADMIN_IDS = [int(i.strip()) for i in os.environ.get('ADMIN_ID', '5690099705,6106446622').split(',') if i.strip()]
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', "erkinvv17")
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.railway.app")
 
 # -------------------- HOLATLAR --------------------
-# Savol qo'shish holatlari
 ASK_TEXT, ASK_A, ASK_B, ASK_C, ASK_D, ASK_CORRECT = range(6)
-# Savol tahrirlash holatlari
 EDIT_TEXT, EDIT_A, EDIT_B, EDIT_C, EDIT_D, EDIT_CORRECT = range(6, 12)
+
+def is_admin(user_id: int) -> bool:
+    return user_id in ADMIN_IDS
 
 # -------------------- START --------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -35,11 +39,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.add(user)
         db.commit()
 
-    webapp_btn = InlineKeyboardButton(
-        text="📝 Testni ochish",
-        web_app=WebAppInfo(url=WEBAPP_URL)
-    )
-    keyboard = InlineKeyboardMarkup([[webapp_btn]])
+    buttons = [[InlineKeyboardButton("📝 Testni ochish", web_app=WebAppInfo(url=WEBAPP_URL))]]
+    
+    # Faqat adminga ko'rinadigan tugma
+    if is_admin(user_id):
+        buttons.append([InlineKeyboardButton("⚙️ Admin Panel", callback_data="admin_panel")])
+
+    keyboard = InlineKeyboardMarkup(buttons)
     await update.message.reply_text(
         f"Assalomu alaykum, {full_name}!\n"
         f"⚖️ Huquqiy test botiga xush kelibsiz.\n\n"
@@ -49,123 +55,147 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     db.close()
 
-# -------------------- ADMIN: GRANT --------------------
-async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ Siz admin emassiz!")
+# -------------------- ADMIN PANEL MENUSI --------------------
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id if update.effective_user else update.callback_query.from_user.id
+    if not is_admin(user_id):
         return
-    args = context.args
-    if len(args) < 1:
-        await update.message.reply_text("❗️ Ishlatish: /grant @username [son]")
-        return
-    target = args[0].replace("@", "")
-    count = 1
-    if len(args) >= 2:
-        try:
-            count = int(args[1])
-        except:
-            await update.message.reply_text("❗️ Sonni to'g'ri kiriting")
-            return
-    db = SessionLocal()
-    if target.isdigit():
-        user = db.query(User).filter_by(user_id=int(target)).first()
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ Savol qo'shish", callback_data="btn_add_q")],
+        [InlineKeyboardButton("📋 Savollar ro'yxati", callback_data="btn_list_q")],
+        [InlineKeyboardButton("📊 Baza statistikasi", callback_data="btn_stats_q")],
+        [InlineKeyboardButton("🎁 Test berish qo'llanmasi", callback_data="btn_grant_info")]
+    ])
+
+    text = "🛠 **Admin Boshqaruv Paneli**\n\nKerakli bo'limni tanlang:"
+    
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
     else:
-        user = db.query(User).filter_by(username=target).first()
-    if not user:
-        await update.message.reply_text("❌ Foydalanuvchi topilmadi")
+        await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
+
+# -------------------- CALLBACK QUERY HANDLER --------------------
+async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    user_id = query.from_user.id
+
+    if not is_admin(user_id):
+        return
+
+    if data == "admin_panel":
+        await admin_panel(update, context)
+
+    elif data == "btn_list_q":
+        await list_questions_callback(query)
+
+    elif data == "btn_stats_q":
+        db = SessionLocal()
+        q_count = db.query(Question).count()
+        u_count = db.query(User).count()
+        r_count = db.query(TestResult).count()
         db.close()
-        return
-    user.tests_remaining += count
-    user.access_granted_at = datetime.now()
-    db.commit()
-    await update.message.reply_text(f"✅ @{user.username} ga {count} ta test berildi! (Jami: {user.tests_remaining})")
-    db.close()
+        
+        msg = f"📊 **Statistika:**\n\n👥 Foydalanuvchilar: {u_count} ta\n❓ Savollar: {q_count} ta\n📝 Yechilgan testlar: {r_count} ta"
+        back_btn = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Orqaga", callback_data="admin_panel")]])
+        await query.message.edit_text(msg, reply_markup=back_btn, parse_mode="Markdown")
 
-# -------------------- ADMIN: SAVOLLAR RO'YXATI --------------------
-async def list_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ Faqat admin!")
-        return
+    elif data == "btn_grant_info":
+        msg = "🎁 **Foydalanuvchiga test berish:**\n\nBuyruq shakli:\n`/grant @username 5`\nyoki ID orqali:\n`/grant 12345678 5`"
+        back_btn = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Orqaga", callback_data="admin_panel")]])
+        await query.message.edit_text(msg, reply_markup=back_btn, parse_mode="Markdown")
 
+    elif data.startswith("del_q_"):
+        q_id = int(data.split("_")[2])
+        db = SessionLocal()
+        q = db.query(Question).filter_by(id=q_id).first()
+        if q:
+            db.delete(q)
+            db.commit()
+            await query.message.edit_text(f"✅ ID #{q_id} savoli o'chirildi!")
+        else:
+            await query.message.edit_text("❌ Savol topilmadi.")
+        db.close()
+
+# -------------------- SAVOLLAR RO'YXATI (BUTTONS) --------------------
+async def list_questions_callback(query):
     db = SessionLocal()
-    questions = db.query(Question).all()
+    questions = db.query(Question).order_by(Question.id.desc()).limit(15).all()
     db.close()
 
     if not questions:
-        await update.message.reply_text("📭 Bazada hech qanday savol topilmadi.")
+        back_btn = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Orqaga", callback_data="admin_panel")]])
+        await query.message.edit_text("📭 Bazada hech qanday savol topilmadi.", reply_markup=back_btn)
         return
 
-    msg = "📋 Baza savollari ro'yxati:\n\n"
-    for q in questions[:20]:
-        msg += f"🆔 {q.id}: {q.text[:40]}... (To'g'ri: {q.correct_answer})\n"
+    msg = "📋 **So'nggi savollar ro'yxati:**\n\n"
+    buttons = []
+    for q in questions:
+        msg += f"🆔 **{q.id}**: {q.text[:35]}... (To'g'ri: {q.correct_answer})\n"
+        buttons.append([
+            InlineKeyboardButton(f"✏️ #{q.id} Tahrirlash", callback_data=f"edit_info_{q.id}"),
+            InlineKeyboardButton(f"🗑 #{q.id} O'chirish", callback_data=f"del_q_{q.id}")
+        ])
 
-    msg += f"\n📊 Jami savollar: {len(questions)} ta"
-    msg += "\n✏️ Tahrirlash: /update_question ID"
-    msg += "\n🗑 O'chirish: /delete_question ID"
+    buttons.append([InlineKeyboardButton("⬅️ Orqaga", callback_data="admin_panel")])
+    await query.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
 
-    await update.message.reply_text(msg)
-# -------------------- ADMIN: SAVOLNI O'CHIRISH --------------------
-async def delete_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ Faqat admin!")
-        return
-
-    if not context.args or not context.args[0].isdigit():
-        await update.message.reply_text("❗️ Ishlatish: `/delete_question ID` (masalan: `/delete_question 1`)", parse_mode="Markdown")
-        return
-
-    q_id = int(context.args[0])
-    db = SessionLocal()
-    q = db.query(Question).filter_by(id=q_id).first()
-
-    if not q:
-        await update.message.reply_text("❌ Bunday ID ga ega savol topilmadi.")
-        db.close()
-        return
-
-    db.delete(q)
-    db.commit()
-    db.close()
-    await update.message.reply_text(f"✅ ID #{q_id} bo'lgan savol o'chirildi!")
-
-# -------------------- ADMIN: SAVOL QO'SHISH --------------------
+# -------------------- SAVOL QO'SHISH (CONVERSATION) --------------------
 async def add_question_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ Faqat admin!")
+    query = update.callback_query
+    if query:
+        await query.answer()
+        user_id = query.from_user.id
+        message_func = query.message.reply_text
+    else:
+        user_id = update.effective_user.id
+        message_func = update.message.reply_text
+
+    if not is_admin(user_id):
         return ConversationHandler.END
-    await update.message.reply_text("📝 Savol matnini yozing:")
+
+    await message_func("📝 **Yangi savol matnini yozing:**", parse_mode="Markdown")
     return ASK_TEXT
 
 async def ask_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['text'] = update.message.text
-    await update.message.reply_text("✏️ Variant A:")
+    await update.message.reply_text("✏️ **Variant A:**", parse_mode="Markdown")
     return ASK_A
 
 async def ask_a(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['option_a'] = update.message.text
-    await update.message.reply_text("✏️ Variant B:")
+    await update.message.reply_text("✏️ **Variant B:**", parse_mode="Markdown")
     return ASK_B
 
 async def ask_b(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['option_b'] = update.message.text
-    await update.message.reply_text("✏️ Variant C:")
+    await update.message.reply_text("✏️ **Variant C:**", parse_mode="Markdown")
     return ASK_C
 
 async def ask_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['option_c'] = update.message.text
-    await update.message.reply_text("✏️ Variant D:")
+    await update.message.reply_text("✏️ **Variant D:**", parse_mode="Markdown")
     return ASK_D
 
 async def ask_d(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['option_d'] = update.message.text
-    await update.message.reply_text("✅ To'g'ri javob (A/B/C/D):")
+    
+    # Variant tanlash uchun tugmalar
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("A", callback_data="ans_A"), InlineKeyboardButton("B", callback_data="ans_B")],
+        [InlineKeyboardButton("C", callback_data="ans_C"), InlineKeyboardButton("D", callback_data="ans_D")]
+    ])
+    await update.message.reply_text("✅ **To'g'ri variantni tanlang:**", reply_markup=keyboard, parse_mode="Markdown")
     return ASK_CORRECT
 
-async def ask_correct(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    correct = update.message.text.upper()
-    if correct not in ['A','B','C','D']:
-        await update.message.reply_text("❌ Faqat A, B, C yoki D")
-        return ASK_CORRECT
+async def ask_correct_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    correct = query.data.replace("ans_", "")
+
     db = SessionLocal()
     q = Question(
         text=context.user_data['text'],
@@ -178,149 +208,74 @@ async def ask_correct(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.add(q)
     db.commit()
     db.close()
-    await update.message.reply_text("✅ Savol qo'shildi!")
+
+    back_btn = InlineKeyboardMarkup([[InlineKeyboardButton("⚙️ Admin Panel", callback_data="admin_panel")]])
+    await query.message.edit_text(f"✅ Savol muvaffaqiyatli qo'shildi! (To'g'ri javob: {correct})", reply_markup=back_btn)
     context.user_data.clear()
     return ConversationHandler.END
 
-# -------------------- ADMIN: SAVOLNI TAHRIRLASH --------------------
-async def update_question_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ Faqat admin!")
-        return ConversationHandler.END
+# -------------------- TAHRIRLASH QO'LLANMA --------------------
+async def edit_info_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    q_id = query.data.split("_")[2]
+    await query.message.reply_text(f"✏️ Tahrirlash uchun `/update_question {q_id}` buyrug'ini yuboring.", parse_mode="Markdown")
 
-    if not context.args or not context.args[0].isdigit():
-        await update.message.reply_text("❗️ Ishlatish: `/update_question ID` (masalan: `/update_question 1`)", parse_mode="Markdown")
-        return ConversationHandler.END
-
-    q_id = int(context.args[0])
+# -------------------- OTHER COMMANDS --------------------
+async def grant(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    args = context.args
+    if len(args) < 1:
+        await update.message.reply_text("❗️ Ishlatish: `/grant @username [son]`", parse_mode="Markdown")
+        return
+    target = args[0].replace("@", "")
+    count = int(args[1]) if len(args) >= 2 and args[1].isdigit() else 1
+    
     db = SessionLocal()
-    q = db.query(Question).filter_by(id=q_id).first()
+    user = db.query(User).filter_by(user_id=int(target)).first() if target.isdigit() else db.query(User).filter_by(username=target).first()
+    if not user:
+        await update.message.reply_text("❌ Foydalanuvchi topilmadi")
+        db.close()
+        return
+    user.tests_remaining += count
+    user.access_granted_at = datetime.now()
+    db.commit()
+    await update.message.reply_text(f"✅ @{user.username or user.user_id} ga {count} ta test berildi!")
     db.close()
-
-    if not q:
-        await update.message.reply_text("❌ Bunday ID ga ega savol topilmadi.")
-        return ConversationHandler.END
-
-    context.user_data['edit_id'] = q_id
-    await update.message.reply_text(f"✏️ ID #{q_id} uchun yangi savol matnini kiriting:")
-    return EDIT_TEXT
-
-async def edit_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['edit_text'] = update.message.text
-    await update.message.reply_text("✏️ Yangi Variant A:")
-    return EDIT_A
-
-async def edit_a(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['edit_a'] = update.message.text
-    await update.message.reply_text("✏️ Yangi Variant B:")
-    return EDIT_B
-
-async def edit_b(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['edit_b'] = update.message.text
-    await update.message.reply_text("✏️ Yangi Variant C:")
-    return EDIT_C
-
-async def edit_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['edit_c'] = update.message.text
-    await update.message.reply_text("✏️ Yangi Variant D:")
-    return EDIT_D
-
-async def edit_d(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['edit_d'] = update.message.text
-    await update.message.reply_text("✅ Yangi to'g'ri javob (A/B/C/D):")
-    return EDIT_CORRECT
-
-async def edit_correct(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    correct = update.message.text.upper()
-    if correct not in ['A','B','C','D']:
-        await update.message.reply_text("❌ Faqat A, B, C yoki D")
-        return EDIT_CORRECT
-
-    q_id = context.user_data['edit_id']
-    db = SessionLocal()
-    q = db.query(Question).filter_by(id=q_id).first()
-
-    if q:
-        q.text = context.user_data['edit_text']
-        q.option_a = context.user_data['edit_a']
-        q.option_b = context.user_data['edit_b']
-        q.option_c = context.user_data['edit_c']
-        q.option_d = context.user_data['edit_d']
-        q.correct_answer = correct
-        db.commit()
-        await update.message.reply_text(f"✅ ID #{q_id} savoli muvaffaqiyatli yangilandi!")
-    else:
-        await update.message.reply_text("❌ Xatolik yuz berdi.")
-
-    db.close()
-    context.user_data.clear()
-    return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ Bekor qilindi")
     context.user_data.clear()
     return ConversationHandler.END
 
-# -------------------- STATUS --------------------
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    db = SessionLocal()
-    user = db.query(User).filter_by(user_id=user_id).first()
-    if not user:
-        await update.message.reply_text("❌ /start bosing")
-        db.close()
-        return
-    await update.message.reply_text(f"📊 Qolgan testlar: {user.tests_remaining}")
-    db.close()
-
-# -------------------- PLANS --------------------
-async def plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = "📦 Paketlar:\n5 ta – 5000 so'm\n10 ta – 10000 so'm\n15 ta – 13500 so'm"
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💬 Admin", url=f"https://t.me/{ADMIN_USERNAME.split(',')[0]}")]
-    ])
-    await update.message.reply_text(text, reply_markup=keyboard)
-
-# -------------------- ASOSIY FUNKSIYA --------------------
+# -------------------- MAIN --------------------
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
     add_conv = ConversationHandler(
-        entry_points=[CommandHandler("add_question", add_question_start)],
+        entry_points=[
+            CommandHandler("add_question", add_question_start),
+            CallbackQueryHandler(add_question_start, pattern="^btn_add_q$")
+        ],
         states={
             ASK_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_text)],
             ASK_A: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_a)],
             ASK_B: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_b)],
             ASK_C: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_c)],
             ASK_D: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_d)],
-            ASK_CORRECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_correct)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-        allow_reentry=True
-    )
-
-    update_conv = ConversationHandler(
-        entry_points=[CommandHandler("update_question", update_question_start)],
-        states={
-            EDIT_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_text)],
-            EDIT_A: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_a)],
-            EDIT_B: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_b)],
-            EDIT_C: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_c)],
-            EDIT_D: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_d)],
-            EDIT_CORRECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_correct)],
+            ASK_CORRECT: [CallbackQueryHandler(ask_correct_button, pattern="^ans_")],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         allow_reentry=True
     )
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("admin", admin_panel))
     app.add_handler(CommandHandler("grant", grant))
-    app.add_handler(CommandHandler("status", status))
-    app.add_handler(CommandHandler("plans", plans))
-    app.add_handler(CommandHandler("list", list_questions))
-    app.add_handler(CommandHandler("delete_question", delete_question))
     app.add_handler(add_conv)
-    app.add_handler(update_conv)
+    app.add_handler(CallbackQueryHandler(edit_info_callback, pattern="^edit_info_"))
+    app.add_handler(CallbackQueryHandler(admin_callback_handler))
 
     app.run_polling()
 

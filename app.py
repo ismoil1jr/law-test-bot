@@ -280,7 +280,6 @@ def finish_test():
         db.close()
 
 # -------------------- BOTNI ISHLATISH --------------------
-# -------------------- BOT VA SERVERNI ISHLATISH --------------------
 def run_bot():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -301,11 +300,8 @@ def run_bot():
     application.add_handler(CallbackQueryHandler(auto_add_block, pattern="^btn_auto_add_block$"))
     application.add_handler(CallbackQueryHandler(view_questions_pagination, pattern="^btn_view_q_"))
     
-    application.run_polling(drop_pending_updates=True)
-
-# Gunicorn import qilganda ham bot fonda avtomatik yurgaziladi:
-bot_thread = threading.Thread(target=run_bot, daemon=True)
-bot_thread.start()
+    # stop_signals=None parametri background thread uchun signal xatosini o'chiradi
+    application.run_polling(drop_pending_updates=True, stop_signals=None)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

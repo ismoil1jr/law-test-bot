@@ -649,6 +649,14 @@ def start_bot_thread():
 
 start_bot_thread()
 
+
+from seed import init_and_seed
+
+# Server ishga tushishi bilan bazani avto-seed qilish
+init_and_seed()
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
+

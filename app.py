@@ -569,7 +569,7 @@ def finish_test():
         return jsonify({"correct": correct, "wrong": wrong, "percentage": percentage})
     finally:
         db.close()
-
+        
 # -------------------- BOTNI ISHLATISH --------------------
 def run_bot():
     loop = asyncio.new_event_loop()
@@ -584,7 +584,8 @@ def run_bot():
             REG_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_name)],
             REG_PHONE: [MessageHandler(filters.CONTACT | (filters.TEXT & ~filters.COMMAND), reg_phone)],
         },
-        fallbacks=[CommandHandler('start', start)]
+        fallbacks=[CommandHandler('start', start)],
+        per_message=False  # PTBWarning yo'qotish uchun
     )
 
     # Question Add Conversation
@@ -602,7 +603,8 @@ def run_bot():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, save_question)
             ],
         },
-        fallbacks=[]
+        fallbacks=[],
+        per_message=False  # PTBWarning yo'qotish uchun
     )
 
     # Question Edit Conversation
@@ -612,7 +614,8 @@ def run_bot():
             EDIT_Q_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_edit_text)],
             EDIT_Q_CORRECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_edit_question)]
         },
-        fallbacks=[]
+        fallbacks=[],
+        per_message=False  # PTBWarning yo'qotish uchun
     )
     
     application.add_handler(user_conv)
@@ -632,8 +635,18 @@ def run_bot():
     
     application.run_polling(drop_pending_updates=True, stop_signals=None)
 
-bot_thread = threading.Thread(target=run_bot, daemon=True)
-bot_thread.start()
+# -------------------- BOT THREAD VA SERVERNI ISHGATUSHIRISH --------------------
+# Gunicorn faqat 1 marta thread yaratishi uchun:
+if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or os.environ.get("SERVER_SOFTWARE", "").startswith("gunicorn"):
+    # Gunicorn muhitida faqat asosiy jarayonda botni ishga tushirish uchun guard
+    pass
+
+# Oddiy lokal rejim va Gunicorn uchun xavfsiz start:
+def start_bot_thread():
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+
+start_bot_thread()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

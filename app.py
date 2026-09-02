@@ -1,6 +1,6 @@
 import os, logging, asyncio, threading
 from datetime import datetime
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from sqlalchemy import func
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
@@ -15,6 +15,9 @@ ADMIN_IDS = [int(i.strip()) for i in os.environ.get('ADMIN_ID', '5690099705,6106
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.railway.app")
 
 REG_NAME, REG_PHONE = range(2)
+# Admin conversation holatlari
+ADD_Q_TYPE, ADD_Q_TEXT, ADD_Q_A, ADD_Q_B, ADD_Q_C, ADD_Q_D, ADD_Q_CORRECT = range(2, 9)
+EDIT_Q_TEXT, EDIT_Q_CORRECT = range(9, 11)
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 CORS(app)
@@ -83,18 +86,82 @@ async def show_main_menu(update: Update, user):
     elif update.callback_query:
         await update.callback_query.message.reply_text(msg_text, reply_markup=InlineKeyboardMarkup(buttons))
 
+# -------------------- GRANT COMMAND --------------------
+async def grant_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "❌ **Xato foydalanish!**\n\n"
+            "Format: `/grant <user_id yoki @username> [soni]`\n"
+            "Misol: `/grant 5690099705 2` yoki `/grant @erkinvv17`",
+            parse_mode="Markdown"
+        )
+        return
+
+    target = args[0].replace('@', '').strip()
+    count = int(args[1]) if len(args) > 1 and args[1].isdigit() else 1
+
+    db = SessionLocal()
+    user = None
+    if target.isdigit():
+        user = db.query(User).filter_by(user_id=int(target)).first()
+    else:
+        user = db.query(User).filter(func.lower(User.username) == target.lower()).first()
+
+    if not user:
+        db.close()
+        await update.message.reply_text("❌ Foydalanuvchi bazadan topilmadi!")
+        return
+
+    user.tests_remaining += count
+    db.commit()
+    new_count = user.tests_remaining
+    db.close()
+
+    await update.message.reply_text(
+        f"✅ **{user.full_name or user.username or user.user_id}** ga {count} ta test imkoniyati berildi!\n"
+        f"📊 Jami imkoniyati: `{new_count}` ta",
+        parse_mode="Markdown"
+    )
+
+# -------------------- ADMIN PANEL & STATS --------------------
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if query: await query.answer()
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("➕ Yangi Blok Yaratish", callback_data="btn_auto_add_block")],
-        [InlineKeyboardButton("📋 Savollarni Ko'rish (< >)", callback_data="btn_view_q_0")]
+        [InlineKeyboardButton("📦 Bloklar va Savollar", callback_data="btn_list_blocks")],
+        [InlineKeyboardButton("📊 Foydalanuvchilar Statistikasi", callback_data="btn_admin_stats")]
     ])
     text = "🛠 **Admin Boshqaruv Paneli**"
     if query:
         await query.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
+async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    db = SessionLocal()
+    total_users = db.query(User).count()
+    registered_users = db.query(User).filter_by(is_registered=True).count()
+    total_tests = db.query(TestResult).count()
+    db.close()
+
+    stat_text = (
+        "📊 **Foydalanuvchilar Statistikasi**\n\n"
+        f"👤 Jami foydalanuvchilar: **{total_users}**\n"
+        f"✅ Ro'yxatdan o'tganlar: **{registered_users}**\n"
+        f"📝 Yakunlangan testlar: **{total_tests}**"
+    )
+
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Admin Panel", callback_data="admin_panel")]])
+    await query.message.edit_text(stat_text, reply_markup=kb, parse_mode="Markdown")
+
+# -------------------- BLOKLAR VA SAVOLLAR MANAGE --------------------
 async def auto_add_block(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -103,38 +170,261 @@ async def auto_add_block(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_block = Block(title=f"{count + 1}-Blok")
     db.add(new_block)
     db.commit()
+    b_id = new_block.id
     title = new_block.title
     db.close()
-    await query.message.reply_text(f"✅ Yangi `{title}` yaratildi!", parse_mode="Markdown")
 
-async def view_questions_pagination(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await query.message.reply_text(f"✅ Yangi `{title}` yaratildi!", parse_mode="Markdown")
+    await show_block_detail(query, b_id)
+
+async def list_blocks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    page = int(query.data.split("_")[-1])
 
     db = SessionLocal()
-    total_q = db.query(Question).count()
-    q = db.query(Question).order_by(Question.id.asc()).offset(page).first()
+    blocks = db.query(Block).order_by(Block.id.asc()).all()
 
-    if not q:
-        await query.message.edit_text("📋 Bazada savollar yo'q.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Orqaga", callback_data="admin_panel")]]))
+    if not blocks:
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Orqaga", callback_data="admin_panel")]])
+        await query.message.edit_text("📦 Bazada hali bloklar mavjud emas.", reply_markup=kb)
         db.close()
         return
 
-    text = f"❓ **Savol {page + 1}/{total_q}** ({q.block.title})\n"
-    text += f"📌 Turi: {'Variantli' if q.q_type == 'mcq' else 'Ochiq test'}\n\n"
+    buttons = []
+    for b in blocks:
+        q_cnt = db.query(Question).filter_by(block_id=b.id).count()
+        buttons.append([InlineKeyboardButton(f"📦 {b.title} ({q_cnt}/45 savol)", callback_data=f"btn_block_{b.id}")])
+
+    buttons.append([InlineKeyboardButton("⬅️ Admin Panel", callback_data="admin_panel")])
+    db.close()
+
+    await query.message.edit_text("📦 **Mavjud Bloklar:**", reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+
+async def block_detail_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    block_id = int(query.data.split("_")[-1])
+    await show_block_detail(query, block_id)
+
+async def show_block_detail(query, block_id: int):
+    db = SessionLocal()
+    block = db.query(Block).filter_by(id=block_id).first()
+    if not block:
+        db.close()
+        return
+
+    mcq_cnt = db.query(Question).filter_by(block_id=block_id, q_type='mcq').count()
+    open_cnt = db.query(Question).filter_by(block_id=block_id, q_type='open').count()
+    total_cnt = mcq_cnt + open_cnt
+
+    text = (
+        f"📦 **{block.title}**\n\n"
+        f"📊 Jami savollar: **{total_cnt}/45**\n"
+        f"🔹 Variantli (MCQ): **{mcq_cnt}/35**\n"
+        f"🔸 Ochiq test: **{open_cnt}/10**"
+    )
+
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ Savol qo'shish", callback_data=f"btn_add_q_{block_id}")],
+        [InlineKeyboardButton("📋 Savollarni ko'rish", callback_data=f"btn_view_bq_{block_id}_0")],
+        [InlineKeyboardButton("🗑 Blokni o'chirish", callback_data=f"btn_del_block_{block_id}")],
+        [InlineKeyboardButton("⬅️ Bloklar ro'yxatiga", callback_data="btn_list_blocks")]
+    ])
+
+    await query.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    db.close()
+
+async def delete_block(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    block_id = int(query.data.split("_")[-1])
+
+    db = SessionLocal()
+    block = db.query(Block).filter_by(id=block_id).first()
+    if block:
+        db.delete(block)
+        db.commit()
+    db.close()
+
+    await query.message.reply_text("✅ Blok va uning barcha savollari o'chirildi!")
+    await list_blocks(update, context)
+
+# -------------------- SAVOL QO'SHISH CONVERSATION --------------------
+async def start_add_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    block_id = int(query.data.split("_")[-1])
+    context.user_data['target_block_id'] = block_id
+
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔹 Variantli test (MCQ)", callback_data="qtype_mcq")],
+        [InlineKeyboardButton("🔸 Ochiq test (Open)", callback_data="qtype_open")]
+    ])
+    await query.message.reply_text("❓ **Savol turini tanlang:**", reply_markup=kb, parse_mode="Markdown")
+    return ADD_Q_TYPE
+
+async def select_q_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    q_type = "mcq" if query.data == "qtype_mcq" else "open"
+    context.user_data['q_type'] = q_type
+
+    await query.message.reply_text("📝 Savol matnini kiriting:")
+    return ADD_Q_TEXT
+
+async def input_q_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['q_text'] = update.message.text.strip()
+    q_type = context.user_data.get('q_type')
+
+    if q_type == 'mcq':
+        await update.message.reply_text("A) Variant matnini kiriting:")
+        return ADD_Q_A
+    else:
+        await update.message.reply_text("✅ To'g me to'g'ri javob matnini kiriting:")
+        return ADD_Q_CORRECT
+
+async def input_q_a(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['opt_a'] = update.message.text.strip()
+    await update.message.reply_text("B) Variant matnini kiriting:")
+    return ADD_Q_B
+
+async def input_q_b(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['opt_b'] = update.message.text.strip()
+    await update.message.reply_text("C) Variant matnini kiriting:")
+    return ADD_Q_C
+
+async def input_q_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['opt_c'] = update.message.text.strip()
+    await update.message.reply_text("D) Variant matnini kiriting:")
+    return ADD_Q_D
+
+async def input_q_d(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['opt_d'] = update.message.text.strip()
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("A", callback_data="ans_A"), InlineKeyboardButton("B", callback_data="ans_B")],
+        [InlineKeyboardButton("C", callback_data="ans_C"), InlineKeyboardButton("D", callback_data="ans_D")]
+    ])
+    await update.message.reply_text("✅ To'g'ri javob qaysi variant?", reply_markup=kb)
+    return ADD_Q_CORRECT
+
+async def save_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q_type = context.user_data.get('q_type')
+    block_id = context.user_data.get('target_block_id')
+
+    if q_type == 'mcq':
+        query = update.callback_query
+        await query.answer()
+        correct_ans = query.data.split("_")[-1]
+    else:
+        correct_ans = update.message.text.strip()
+
+    db = SessionLocal()
+    new_q = Question(
+        block_id=block_id,
+        q_type=q_type,
+        text=context.user_data.get('q_text'),
+        option_a=context.user_data.get('opt_a'),
+        option_b=context.user_data.get('opt_b'),
+        option_c=context.user_data.get('opt_c'),
+        option_d=context.user_data.get('opt_d'),
+        correct_answer=correct_ans
+    )
+    db.add(new_q)
+    db.commit()
+    db.close()
+
+    msg = update.callback_query.message if update.callback_query else update.message
+    await msg.reply_text("✅ Savol muvaffaqiyatli saqlandi!")
+    return ConversationHandler.END
+
+# -------------------- SAVOLLARNI KO'RISH / TAHRIRLASH / O'CHIRISH --------------------
+async def view_block_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split("_")
+    block_id = int(parts[3])
+    page = int(parts[4])
+
+    db = SessionLocal()
+    questions = db.query(Question).filter_by(block_id=block_id).order_by(Question.id.asc()).all()
+    total_q = len(questions)
+
+    if not questions:
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Orqaga", callback_data=f"btn_block_{block_id}")]])
+        await query.message.edit_text("📋 Ushbu blokda hali savollar mavjud emas.", reply_markup=kb)
+        db.close()
+        return
+
+    q = questions[page]
+
+    text = f"❓ **Savol {page + 1}/{total_q}**\n"
+    text += f"📌 Turi: {'Variantli (MCQ)' if q.q_type == 'mcq' else 'Ochiq test'}\n\n"
     text += f"**Matn:** {q.text}\n"
     if q.q_type == 'mcq':
         text += f"A) {q.option_a}\nB) {q.option_b}\nC) {q.option_c}\nD) {q.option_d}\n"
     text += f"\n✅ **To'g'ri javob:** `{q.correct_answer}`"
 
     nav = []
-    if page > 0: nav.append(InlineKeyboardButton("◀️ Oldingi", callback_data=f"btn_view_q_{page - 1}"))
-    if page < total_q - 1: nav.append(InlineKeyboardButton("Keyingi ▶️", callback_data=f"btn_view_q_{page + 1}"))
+    if page > 0: nav.append(InlineKeyboardButton("◀️ Oldingi", callback_data=f"btn_view_bq_{block_id}_{page - 1}"))
+    if page < total_q - 1: nav.append(InlineKeyboardButton("Keyingi ▶️", callback_data=f"btn_view_bq_{block_id}_{page + 1}"))
 
-    kb = InlineKeyboardMarkup([nav, [InlineKeyboardButton("⬅️ Admin Panel", callback_data="admin_panel")]])
+    action_row = [
+        InlineKeyboardButton("✏️ Tahrirlash", callback_data=f"btn_edit_q_{q.id}"),
+        InlineKeyboardButton("🗑 O'chirish", callback_data=f"btn_del_q_{q.id}_{block_id}")
+    ]
+
+    kb = InlineKeyboardMarkup([nav, action_row, [InlineKeyboardButton("⬅️ Blok menyusiga", callback_data=f"btn_block_{block_id}")]])
     await query.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
     db.close()
+
+async def delete_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split("_")
+    q_id = int(parts[3])
+    block_id = int(parts[4])
+
+    db = SessionLocal()
+    q = db.query(Question).filter_by(id=q_id).first()
+    if q:
+        db.delete(q)
+        db.commit()
+    db.close()
+
+    await query.message.reply_text("✅ Savol o'chirildi!")
+    await show_block_detail(query, block_id)
+
+async def start_edit_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    q_id = int(query.data.split("_")[-1])
+    context.user_data['edit_q_id'] = q_id
+
+    await query.message.reply_text("📝 Savolning yangi matnini kiriting:")
+    return EDIT_Q_TEXT
+
+async def input_edit_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['edit_text'] = update.message.text.strip()
+    await update.message.reply_text("✅ Savolning yangi to'g'ri javobini kiriting:")
+    return EDIT_Q_CORRECT
+
+async def save_edit_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q_id = context.user_data.get('edit_q_id')
+    new_text = context.user_data.get('edit_text')
+    new_ans = update.message.text.strip()
+
+    db = SessionLocal()
+    q = db.query(Question).filter_by(id=q_id).first()
+    if q:
+        q.text = new_text
+        q.correct_answer = new_ans
+        db.commit()
+    db.close()
+
+    await update.message.reply_text("✅ Savol muvaffaqiyatli yangilandi!")
+    return ConversationHandler.END
 
 # -------------------- FLASK API ROUTELARI --------------------
 @app.route('/')
@@ -286,7 +576,8 @@ def run_bot():
     
     application = Application.builder().token(BOT_TOKEN).build()
     
-    conv_handler = ConversationHandler(
+    # User Registration Conversation
+    user_conv = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
             REG_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, reg_name)],
@@ -294,16 +585,52 @@ def run_bot():
         },
         fallbacks=[CommandHandler('start', start)]
     )
+
+    # Question Add Conversation
+    add_q_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_add_question, pattern="^btn_add_q_")],
+        states={
+            ADD_Q_TYPE: [CallbackQueryHandler(select_q_type, pattern="^qtype_")],
+            ADD_Q_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_q_text)],
+            ADD_Q_A: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_q_a)],
+            ADD_Q_B: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_q_b)],
+            ADD_Q_C: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_q_c)],
+            ADD_Q_D: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_q_d)],
+            ADD_Q_CORRECT: [
+                CallbackQueryHandler(save_question, pattern="^ans_"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, save_question)
+            ],
+        },
+        fallbacks=[]
+    )
+
+    # Question Edit Conversation
+    edit_q_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_edit_question, pattern="^btn_edit_q_")],
+        states={
+            EDIT_Q_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_edit_text)],
+            EDIT_Q_CORRECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_edit_question)]
+        },
+        fallbacks=[]
+    )
     
-    application.add_handler(conv_handler)
+    application.add_handler(user_conv)
+    application.add_handler(add_q_conv)
+    application.add_handler(edit_q_conv)
+
+    # General Handlers & Commands
+    application.add_handler(CommandHandler('grant', grant_command))
     application.add_handler(CallbackQueryHandler(admin_panel, pattern="^admin_panel$"))
+    application.add_handler(CallbackQueryHandler(admin_stats, pattern="^btn_admin_stats$"))
     application.add_handler(CallbackQueryHandler(auto_add_block, pattern="^btn_auto_add_block$"))
-    application.add_handler(CallbackQueryHandler(view_questions_pagination, pattern="^btn_view_q_"))
+    application.add_handler(CallbackQueryHandler(list_blocks, pattern="^btn_list_blocks$"))
+    application.add_handler(CallbackQueryHandler(block_detail_callback, pattern="^btn_block_"))
+    application.add_handler(CallbackQueryHandler(delete_block, pattern="^btn_del_block_"))
+    application.add_handler(CallbackQueryHandler(view_block_questions, pattern="^btn_view_bq_"))
+    application.add_handler(CallbackQueryHandler(delete_question, pattern="^btn_del_q_"))
     
-    # stop_signals=None background thread uchun signal xatosini o'chiradi
     application.run_polling(drop_pending_updates=True, stop_signals=None)
 
-# Gunicorn import qilgan zahoti bot oqimini fonda ishga tushirish:
 bot_thread = threading.Thread(target=run_bot, daemon=True)
 bot_thread.start()
 

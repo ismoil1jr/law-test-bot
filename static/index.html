@@ -4,14 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
     <title>Huquqiy Test</title>
-    <!-- Font Awesome 6 (bepul) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link rel="stylesheet" href="/static/style.css" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
     <div id="app">
-        <!-- Header -->
         <header>
             <div class="header-left">
                 <i class="fas fa-gavel logo-icon"></i>
@@ -23,7 +21,6 @@
             </div>
         </header>
 
-        <!-- Main Content -->
         <main id="mainContent">
             <!-- HOME -->
             <section id="home" class="page active">
@@ -47,13 +44,24 @@
             <!-- TEST -->
             <section id="test" class="page" style="display:none;">
                 <div class="test-progress">
-                    <span id="questionCounter"><i class="fas fa-question-circle"></i> Savol 1/30</span>
-                    <span id="answeredCounter"><i class="fas fa-check-circle"></i> Javob: 0/30</span>
+                    <span id="blockTitleDisplay" style="font-weight: bold; color: #00d2ff;"></span>
+                    <span id="questionCounter"><i class="fas fa-question-circle"></i> Savol 1/45</span>
+                    <span id="answeredCounter"><i class="fas fa-check-circle"></i> Javob: 0/45</span>
                 </div>
+                
                 <div class="glass-card question-card">
-                    <p id="questionText">Savol matni</p>
+                    <p id="questionText">Savol matni yuklanmoqda...</p>
+                    
                     <div id="optionsContainer"></div>
+                    
+                    <div id="openAnswerContainer" style="display:none; margin-top: 15px;">
+                        <label style="color:#fff; font-size: 14px; display:block; margin-bottom:8px;">
+                            ✍️ Javobingizni aniq kiriting (Lotin alifbosida):
+                        </label>
+                        <input type="text" id="openAnswerInput" class="glass-input" placeholder="Javobni shu yerga yozing..." />
+                    </div>
                 </div>
+                
                 <div class="nav-buttons">
                     <button id="prevBtn" class="nav-btn glass-btn"><i class="fas fa-chevron-left"></i> Oldingi</button>
                     <button id="nextBtn" class="nav-btn glass-btn">Keyingi <i class="fas fa-chevron-right"></i></button>
@@ -89,7 +97,6 @@
             </section>
         </main>
 
-        <!-- Bottom Menu (iOS style) -->
         <footer class="bottom-menu glass">
             <div class="menu-item active" data-page="home">
                 <i class="fas fa-house"></i>

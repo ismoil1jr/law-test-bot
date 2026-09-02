@@ -20,7 +20,7 @@ REG_NAME, REG_PHONE = range(2)
 ADD_Q_TYPE, ADD_Q_TEXT, ADD_Q_A, ADD_Q_B, ADD_Q_C, ADD_Q_D, ADD_Q_CORRECT = range(2, 9)
 EDIT_Q_TEXT, EDIT_Q_CORRECT = range(9, 11)
 
-app = Flask(__name__, static_folder="static", template_folder="templates")
+app = Flask(__name__, static_folder="static", template_folder="static")
 CORS(app)
 
 logging.basicConfig(level=logging.INFO)
@@ -431,7 +431,8 @@ async def save_edit_question(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 @app.route('/')
 def index():
-    return render_template('index.html')  # index.html 'templates' papkasida bo'lishi kerak
+    return app.send_static_file('index.html')
+
 @app.route('/api/user/profile')
 def get_user_profile():
     user_id = request.args.get('user_id', type=int)

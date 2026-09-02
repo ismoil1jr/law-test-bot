@@ -7,8 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# start.sh ni ishga tushirish
-COPY start.sh .
+# start.sh fayliga ijro ruxsatini berish
 RUN chmod +x start.sh
 
 EXPOSE 8000

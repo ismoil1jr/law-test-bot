@@ -1,1 +1,2 @@
-gunicorn app:app -b 0.0.0.0:$PORT --workers 1   
+#!/bin/bash
+exec gunicorn app:app -b 0.0.0.0:${PORT:-8000} --workers 1

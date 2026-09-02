@@ -300,8 +300,12 @@ def run_bot():
     application.add_handler(CallbackQueryHandler(auto_add_block, pattern="^btn_auto_add_block$"))
     application.add_handler(CallbackQueryHandler(view_questions_pagination, pattern="^btn_view_q_"))
     
-    # stop_signals=None parametri background thread uchun signal xatosini o'chiradi
+    # stop_signals=None background thread uchun signal xatosini o'chiradi
     application.run_polling(drop_pending_updates=True, stop_signals=None)
+
+# Gunicorn import qilgan zahoti bot oqimini fonda ishga tushirish:
+bot_thread = threading.Thread(target=run_bot, daemon=True)
+bot_thread.start()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

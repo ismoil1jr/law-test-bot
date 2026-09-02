@@ -9,7 +9,7 @@ from telegram.ext import (
     MessageHandler, CallbackQueryHandler, filters
 )
 from database import SessionLocal, User, Block, Question, UserAnswer, TestResult
-
+from flask import Flask, request, jsonify, render_template, send_from_directory
 BOT_TOKEN = os.environ.get('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
 ADMIN_IDS = [int(i.strip()) for i in os.environ.get('ADMIN_ID', '5690099705,6106446622').split(',') if i.strip()]
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.railway.app")
@@ -429,7 +429,11 @@ async def save_edit_question(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # -------------------- FLASK API ROUTELARI --------------------
 @app.route('/')
 def index():
-    return send_from_directory('templates', 'index.html') or send_from_directory('.', 'index.html')
+    if os.path.exists(os.path.join(app.template_folder, 'index.html')):
+        return render_template('index.html')
+    elif os.path.exists('index.html'):
+        return send_from_directory('.', 'index.html')
+    return "<h1>Web App serveri ishlamoqda!</h1>", 200
 
 @app.route('/api/user/profile')
 def get_user_profile():

@@ -89,6 +89,16 @@ async def show_main_menu(update: Update, full_name, phone_number, tests_remainin
     elif update.callback_query:
         await update.callback_query.message.reply_text(msg_text, reply_markup=InlineKeyboardMarkup(buttons))
 
+# --------------------- PLAN MENU ---------------------
+async def plans_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = (
+        "⛔️ <b>Tizimda bepul testlar mavjud emas!</b>\n\n"
+        "Siz hali test paketlarini sotib olmadingiz.\n"
+        "Test imkoniyatlari va obuna narxlarini bilish hamda ularni xarid qilish uchun admin bilan bog'laning:\n\n"
+        "👤 <b>Admin:</b> @qurbonov_oIimjon\n"
+    )
+    await update.message.reply_text(msg, parse_mode="HTML")
+
 # -------------------- GRANT COMMAND --------------------
 async def grant_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
@@ -97,10 +107,10 @@ async def grant_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     if not args:
         await update.message.reply_text(
-            "❌ **Xato foydalanish!**\n\n"
-            "Format: `/grant <user_id yoki @username> [soni]`\n"
-            "Misol: `/grant 6106446622 2` yoki `/grant @qurbonov_oIimjon`",
-            parse_mode="Markdown"
+            "❌ <b>Xato foydalanish!</b>\n\n"
+            "Format: <code>/grant &lt;user_id yoki @username&gt; [soni]</code>\n"
+            "Misol: <code>/grant 6106446622 2</code> yoki <code>/grant @qurbonov_oIimjon</code>",
+            parse_mode="HTML"
         )
         return
 
@@ -125,21 +135,10 @@ async def grant_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.close()
 
     await update.message.reply_text(
-        f"✅ **{user.full_name or user.username or user.user_id}** ga {count} ta test imkoniyati berildi!\n"
-        f"📊 Jami imkoniyati: `{new_count}` ta",
-        parse_mode="Markdown"
+        f"✅ <b>{user.full_name or user.username or user.user_id}</b> ga {count} ta test imkoniyati berildi!\n"
+        f"📊 Jami imkoniyati: <code>{new_count}</code> ta",
+        parse_mode="HTML"
     )
-
-# --------------------- PLAN MENU ---------------------
-async def plans_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = (
-        "⛔️ **Tizimda bepul testlar mavjud emas!**\n\n"
-        "Siz hali test paketlarini sotib olmadingiz.\n"
-        "Test imkoniyatlari va obuna narxlarini bilish hamda ularni xarid qilish uchun admin bilan bog'laning:\n\n"
-        "👤 **Admin:** @qurbonov_oIimjon\n"
-        "🆔 **Admin ID:** `6106446622`"
-    )
-    await update.message.reply_text(msg, parse_mode="Markdown")
 
 # -------------------- ADMIN PANEL & STATS --------------------
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):

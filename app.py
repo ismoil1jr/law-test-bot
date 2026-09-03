@@ -1,6 +1,6 @@
-import os, logging, asyncio, threading
+import os, logging, asyncio, threading, random
 from datetime import datetime
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, render_template
 from flask_cors import CORS
 from sqlalchemy import func
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
@@ -9,14 +9,12 @@ from telegram.ext import (
     MessageHandler, CallbackQueryHandler, filters
 )
 from database import SessionLocal, User, Block, Question, UserAnswer, TestResult
-from flask import render_template
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
 ADMIN_IDS = [int(i.strip()) for i in os.environ.get('ADMIN_ID', '5690099705,6106446622').split(',') if i.strip()]
 WEBAPP_URL = os.environ.get('WEBAPP_URL', "https://law-test-bot-production.up.railway.app")
 
 REG_NAME, REG_PHONE = range(2)
-# Admin conversation holatlari
 ADD_Q_TYPE, ADD_Q_TEXT, ADD_Q_A, ADD_Q_B, ADD_Q_C, ADD_Q_D, ADD_Q_CORRECT = range(2, 9)
 EDIT_Q_TEXT, EDIT_Q_CORRECT = range(9, 11)
 
@@ -67,7 +65,6 @@ async def reg_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user.is_registered = True
         db.commit()
         
-        # Ma'lumotlarni db.close() qilishdan oldin o'zgaruvchiga olamiz
         full_name = user.full_name
         phone_number = user.phone_number
         tests_remaining = user.tests_remaining
@@ -102,7 +99,7 @@ async def grant_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❌ **Xato foydalanish!**\n\n"
             "Format: `/grant <user_id yoki @username> [soni]`\n"
-            "Misol: `/grant 5690099705 2` yoki `/grant @erkinvv17`",
+            "Misol: `/grant 6106446622 2` yoki `/grant @qurbonov_oIimjon`",
             parse_mode="Markdown"
         )
         return
@@ -136,9 +133,11 @@ async def grant_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --------------------- PLAN MENU ---------------------
 async def plans_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
-        "📋 **Mavjud tariflar va imkoniyatlar:**\n\n"
-        "🔹 **1 ta test** — Bepul (Start)\n"
-        "🔹 **Qo'shimcha testlar** olish uchun admin bilan bog'laning."
+        "⛔️ **Tizimda bepul testlar mavjud emas!**\n\n"
+        "Siz hali test paketlarini sotib olmadingiz.\n"
+        "Test imkoniyatlari va obuna narxlarini bilish hamda ularni xarid qilish uchun admin bilan bog'laning:\n\n"
+        "👤 **Admin:** @qurbonov_oIimjon\n"
+        "🆔 **Admin ID:** `6106446622`"
     )
     await update.message.reply_text(msg, parse_mode="Markdown")
 
@@ -295,7 +294,7 @@ async def input_q_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("A) Variant matnini kiriting:")
         return ADD_Q_A
     else:
-        await update.message.reply_text("✅ To'g me to'g'ri javob matnini kiriting:")
+        await update.message.reply_text("✅ To'g'ri javob matnini kiriting:")
         return ADD_Q_CORRECT
 
 async def input_q_a(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -496,21 +495,28 @@ def init_test():
     try:
         user = db.query(User).filter_by(user_id=user_id).first()
         if not user or user.tests_remaining <= 0:
-            return jsonify({"error": "Sizda test topshirish huquqi qolmagan!"}), 403
+            return jsonify({"error": "Sizda test topshirish huquqi qolmagan! Admin bilan bog'laning."}), 403
 
-        block = db.query(Block).order_by(Block.id.desc()).first()
-        if not block:
-            return jsonify({"error": "Hali blok va savollar yaratilmagan"}), 400
+        # Barcha mavjud bloklardan aralash savollarni yig'amiz
+        mcq_questions = db.query(Question).filter_by(q_type='mcq').all()
+        open_questions = db.query(Question).filter_by(q_type='open').all()
 
-        questions = db.query(Question).filter_by(block_id=block.id).all()
-        if not questions:
-            return jsonify({"error": "Ushbu blokda savollar mavjud emas"}), 400
+        if len(mcq_questions) < 35 or len(open_questions) < 10:
+            return jsonify({
+                "error": f"Bazada yetarlicha savol mavjud emas! Kamida 35 ta variantli va 10 ta ochiq savol bo'lishi kerak. (Mavjud: MCQ-{len(mcq_questions)}, Open-{len(open_questions)})"
+            }), 400
+
+        selected_mcq = random.sample(mcq_questions, 35)
+        selected_open = random.sample(open_questions, 10)
+        
+        selected_questions = selected_mcq + selected_open
+        random.shuffle(selected_questions)
 
         db.query(UserAnswer).filter_by(user_id=user_id).delete()
         db.commit()
 
         q_data = []
-        for q in questions:
+        for q in selected_questions:
             ua = UserAnswer(user_id=user_id, question_id=q.id)
             db.add(ua)
             q_data.append({
@@ -521,7 +527,7 @@ def init_test():
             })
         db.commit()
 
-        return jsonify({"block_title": block.title, "questions": q_data})
+        return jsonify({"block_title": "Aralash Test Blok (45 ta savol)", "questions": q_data})
     finally:
         db.close()
 
@@ -592,7 +598,6 @@ def run_bot():
     
     application = Application.builder().token(BOT_TOKEN).build()
     
-    # User Registration Conversation
     user_conv = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
@@ -600,10 +605,9 @@ def run_bot():
             REG_PHONE: [MessageHandler(filters.CONTACT | (filters.TEXT & ~filters.COMMAND), reg_phone)],
         },
         fallbacks=[CommandHandler('start', start)],
-        per_message=False  # PTBWarning yo'qotish uchun
+        per_message=False
     )
 
-    # Question Add Conversation
     add_q_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(start_add_question, pattern="^btn_add_q_")],
         states={
@@ -619,10 +623,9 @@ def run_bot():
             ],
         },
         fallbacks=[],
-        per_message=False  # PTBWarning yo'qotish uchun
+        per_message=False
     )
 
-    # Question Edit Conversation
     edit_q_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(start_edit_question, pattern="^btn_edit_q_")],
         states={
@@ -630,16 +633,15 @@ def run_bot():
             EDIT_Q_CORRECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_edit_question)]
         },
         fallbacks=[],
-        per_message=False  # PTBWarning yo'qotish uchun
+        per_message=False
     )
     
     application.add_handler(user_conv)
     application.add_handler(add_q_conv)
     application.add_handler(edit_q_conv)
 
-    # General Handlers & Commands
     application.add_handler(CommandHandler('grant', grant_command))
-    application.add_handler(CommandHandler('plans', plans_command))  # <-- SHU QATORNI QO'SHING!
+    application.add_handler(CommandHandler('plans', plans_command))
     application.add_handler(CallbackQueryHandler(admin_panel, pattern="^admin_panel$"))
     application.add_handler(CallbackQueryHandler(admin_stats, pattern="^btn_admin_stats$"))
     application.add_handler(CallbackQueryHandler(auto_add_block, pattern="^btn_auto_add_block$"))
@@ -652,29 +654,16 @@ def run_bot():
     application.run_polling(drop_pending_updates=True, stop_signals=None)
 
 # -------------------- BOT THREAD VA SERVERNI ISHGATUSHIRISH --------------------
-# Gunicorn faqat 1 marta thread yaratishi uchun:
-if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or os.environ.get("SERVER_SOFTWARE", "").startswith("gunicorn"):
-    # Gunicorn muhitida faqat asosiy jarayonda botni ishga tushirish uchun guard
-    pass
-
-# Oddiy lokal rejim va Gunicorn uchun xavfsiz start:
-# -------------------- BOT THREAD VA SERVERNI ISHGATUSHIRISH --------------------
-# -------------------- BOT THREAD VA SERVERNI ISHGATUSHIRISH --------------------
 def start_bot_thread():
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
 
-from seed import init_and_seed
+# Avto-seed o'chirildi
 
-# Server ishga tushishi bilan bazani avto-seed qilish
-init_and_seed()
-
-# Faqat asosiy dastur ishga tushganda yoki Gunicorn asosiy jarayonida thread yaratish:
 if __name__ == '__main__':
     start_bot_thread()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 elif os.environ.get("SERVER_SOFTWARE", "").startswith("gunicorn"):
-    # Gunicorn workerlari orasida takrorlanmasligi uchun faqat birinchi processda ishlatiladi
     if os.environ.get("GUNICORN_PID") is None or os.getpid() == int(os.environ.get("GUNICORN_PID", 0)):
         start_bot_thread()

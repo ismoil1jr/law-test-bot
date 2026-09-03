@@ -4,14 +4,11 @@ from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, Da
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
-# Railway bergan DATABASE_URL ni oladi, topilmasa lokal SQLite ishlatadi
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///bot_database.db")
 
-# SQLAlchemy 1.4+ versiyalarida "postgres://" bo'lsa "postgresql://" ga almashtirish shart
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# Baza turiga qarab engine sozlanadi
 if "sqlite" in DATABASE_URL:
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
@@ -28,7 +25,7 @@ class User(Base):
     full_name = Column(String(150), nullable=True)
     phone_number = Column(String(30), nullable=True)
     is_registered = Column(Boolean, default=False)
-    tests_remaining = Column(Integer, default=1)
+    tests_remaining = Column(Integer, default=0)  # Bepul imkoniyat o'chirildi (0 ga o'tkazildi)
     created_at = Column(DateTime, default=datetime.now)
 
 class Block(Base):

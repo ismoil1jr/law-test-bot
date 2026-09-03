@@ -654,16 +654,14 @@ def run_bot():
     application.run_polling(drop_pending_updates=True, stop_signals=None)
 
 # -------------------- BOT THREAD VA SERVERNI ISHGATUSHIRISH --------------------
+# -------------------- BOT THREAD VA SERVERNI ISHGATUSHIRISH --------------------
 def start_bot_thread():
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
 
-# Avto-seed o'chirildi
+# Flask va Botni parallel ishga tushirish
+start_bot_thread()
 
 if __name__ == '__main__':
-    start_bot_thread()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-elif os.environ.get("SERVER_SOFTWARE", "").startswith("gunicorn"):
-    if os.environ.get("GUNICORN_PID") is None or os.getpid() == int(os.environ.get("GUNICORN_PID", 0)):
-        start_bot_thread()

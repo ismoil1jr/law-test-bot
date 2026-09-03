@@ -44,7 +44,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return REG_NAME
 
     db.close()
-    await show_main_menu(update, user)
+    await show_main_menu(update, user.full_name, user.phone_number, user.tests_remaining)
     return ConversationHandler.END
 
 async def reg_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -66,21 +66,26 @@ async def reg_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user.phone_number = phone
         user.is_registered = True
         db.commit()
+        
+        # Ma'lumotlarni db.close() qilishdan oldin o'zgaruvchiga olamiz
+        full_name = user.full_name
+        phone_number = user.phone_number
+        tests_remaining = user.tests_remaining
     db.close()
 
     await update.message.reply_text("✅ Ro'yxatdan o'tish muvaffaqiyatli yakunlandi!", reply_markup=ReplyKeyboardRemove())
-    await show_main_menu(update, user)
+    await show_main_menu(update, full_name, phone_number, tests_remaining)
     return ConversationHandler.END
 
-async def show_main_menu(update: Update, user):
+async def show_main_menu(update: Update, full_name, phone_number, tests_remaining):
     buttons = [[InlineKeyboardButton("📝 Test topshirish", web_app={"url": WEBAPP_URL})]]
     if is_admin(update.effective_user.id):
         buttons.append([InlineKeyboardButton("⚙️ Admin Panel", callback_data="admin_panel")])
     
     msg_text = (
-        f"Xush kelibsiz, {user.full_name or 'Foydalanuvchi'}!\n"
-        f"📞 Tel: {user.phone_number or 'Kiritilmagan'}\n"
-        f"📊 Qolgan imkoniyatlar: {user.tests_remaining}"
+        f"Xush kelibsiz, {full_name or 'Foydalanuvchi'}!\n"
+        f"📞 Tel: {phone_number or 'Kiritilmagan'}\n"
+        f"📊 Qolgan imkoniyatlar: {tests_remaining}"
     )
     if update.message:
         await update.message.reply_text(msg_text, reply_markup=InlineKeyboardMarkup(buttons))
@@ -665,8 +670,9 @@ from seed import init_and_seed
 init_and_seed()
 # app.py oxirida:
 
+# app.py faylining eng pastki qismi:
+
 if __name__ == '__main__':
-    start_bot_thread()  # Bot faqat bir marta ishga tushadi
+    start_bot_thread()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-

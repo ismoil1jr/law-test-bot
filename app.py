@@ -654,9 +654,10 @@ from seed import init_and_seed
 
 # Server ishga tushishi bilan bazani avto-seed qilish
 init_and_seed()
+# app.py oxirida:
 
 if __name__ == '__main__':
+    start_bot_thread()  # Bot faqat bir marta ishga tushadi
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
 

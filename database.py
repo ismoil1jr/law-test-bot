@@ -1,10 +1,22 @@
+import os
+from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from datetime import datetime
 
-DATABASE_URL = "sqlite:///bot_database.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# Railway bergan DATABASE_URL ni oladi, topilmasa lokal SQLite ishlatadi
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///bot_database.db")
+
+# SQLAlchemy 1.4+ versiyalarida "postgres://" bo'lsa "postgresql://" ga almashtirish shart
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# Baza turiga qarab engine sozlanadi
+if "sqlite" in DATABASE_URL:
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

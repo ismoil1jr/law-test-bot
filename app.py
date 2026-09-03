@@ -639,6 +639,7 @@ def run_bot():
 
     # General Handlers & Commands
     application.add_handler(CommandHandler('grant', grant_command))
+    application.add_handler(CommandHandler('plans', plans_command))  # <-- SHU QATORNI QO'SHING!
     application.add_handler(CallbackQueryHandler(admin_panel, pattern="^admin_panel$"))
     application.add_handler(CallbackQueryHandler(admin_stats, pattern="^btn_admin_stats$"))
     application.add_handler(CallbackQueryHandler(auto_add_block, pattern="^btn_auto_add_block$"))
@@ -657,22 +658,20 @@ if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or os.environ.get("SERVER_SOFTW
     pass
 
 # Oddiy lokal rejim va Gunicorn uchun xavfsiz start:
+# -------------------- BOT THREAD VA SERVERNI ISHGATUSHIRISH --------------------
 def start_bot_thread():
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
-
-start_bot_thread()
-
 
 from seed import init_and_seed
 
 # Server ishga tushishi bilan bazani avto-seed qilish
 init_and_seed()
-# app.py oxirida:
-
-# app.py faylining eng pastki qismi:
 
 if __name__ == '__main__':
     start_bot_thread()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+else:
+    # Gunicorn orqali ishga tushirilganda faqat 1 marta thread yaratish
+    start_bot_thread()

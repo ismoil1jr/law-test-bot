@@ -659,6 +659,7 @@ if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or os.environ.get("SERVER_SOFTW
 
 # Oddiy lokal rejim va Gunicorn uchun xavfsiz start:
 # -------------------- BOT THREAD VA SERVERNI ISHGATUSHIRISH --------------------
+# -------------------- BOT THREAD VA SERVERNI ISHGATUSHIRISH --------------------
 def start_bot_thread():
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
@@ -668,10 +669,12 @@ from seed import init_and_seed
 # Server ishga tushishi bilan bazani avto-seed qilish
 init_and_seed()
 
+# Faqat asosiy dastur ishga tushganda yoki Gunicorn asosiy jarayonida thread yaratish:
 if __name__ == '__main__':
     start_bot_thread()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-else:
-    # Gunicorn orqali ishga tushirilganda faqat 1 marta thread yaratish
-    start_bot_thread()
+elif os.environ.get("SERVER_SOFTWARE", "").startswith("gunicorn"):
+    # Gunicorn workerlari orasida takrorlanmasligi uchun faqat birinchi processda ishlatiladi
+    if os.environ.get("GUNICORN_PID") is None or os.getpid() == int(os.environ.get("GUNICORN_PID", 0)):
+        start_bot_thread()

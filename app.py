@@ -128,6 +128,15 @@ async def grant_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
+# --------------------- PLAN MENU ---------------------
+async def plans_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = (
+        "📋 **Mavjud tariflar va imkoniyatlar:**\n\n"
+        "🔹 **1 ta test** — Bepul (Start)\n"
+        "🔹 **Qo'shimcha testlar** olish uchun admin bilan bog'laning."
+    )
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
 # -------------------- ADMIN PANEL & STATS --------------------
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

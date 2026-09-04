@@ -354,7 +354,8 @@ async def show_block_detail(query, block_id: int):
         [InlineKeyboardButton("⬅️ Bloklar ro'yxatiga", callback_data="btn_list_blocks")]
     ])
 
-    await query.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    if query.message:
+        await query.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
     db.close()
 
 async def delete_block(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -372,16 +373,19 @@ async def delete_block(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text("✅ Blok va uning barcha savollari o'chirildi!")
     await list_blocks(update, context)
 
-# -------------------- SAVOL QO'SHISH CONVERSATION --------------------
+# -------------------- CONTINUOUS SAVOL QO'SHISH CONVERSATION --------------------
 async def start_add_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    block_id = int(query.data.split("_")[-1])
-    context.user_data['target_block_id'] = block_id
+    
+    if query.data.startswith("btn_add_q_"):
+        block_id = int(query.data.split("_")[-1])
+        context.user_data['target_block_id'] = block_id
 
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔹 Variantli test (MCQ)", callback_data="qtype_mcq")],
-        [InlineKeyboardButton("🔸 Ochiq test (Open)", callback_data="qtype_open")]
+        [InlineKeyboardButton("🔸 Ochiq test (Open)", callback_data="qtype_open")],
+        [InlineKeyboardButton("⬅️ Blok menyusiga qaytish", callback_data="cancel_add_q")]
     ])
     await query.message.reply_text("❓ **Savol turini tanlang:**", reply_markup=kb, parse_mode="Markdown")
     return ADD_Q_TYPE
@@ -454,10 +458,41 @@ async def save_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     db.add(new_q)
     db.commit()
+
+    mcq_cnt = db.query(Question).filter_by(block_id=block_id, q_type='mcq').count()
+    open_cnt = db.query(Question).filter_by(block_id=block_id, q_type='open').count()
     db.close()
 
+    for key in ['q_type', 'q_text', 'opt_a', 'opt_b', 'opt_c', 'opt_d']:
+        context.user_data.pop(key, None)
+
     msg = update.callback_query.message if update.callback_query else update.message
-    await msg.reply_text("✅ Savol muvaffaqiyatli saqlandi!")
+    
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔹 Variantli test (MCQ)", callback_data="qtype_mcq")],
+        [InlineKeyboardButton("🔸 Ochiq test (Open)", callback_data="qtype_open")],
+        [InlineKeyboardButton("⬅️ Blok menyusiga qaytish", callback_data="cancel_add_q")]
+    ])
+
+    await msg.reply_text(
+        f"✅ **Savol saqlandi!**\n"
+        f"📊 Blokdagi holat: MCQ: **{mcq_cnt}/35**, Open: **{open_cnt}/10**\n\n"
+        f"Yana savol qo'shasizmi? Savol turini tanlang:",
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
+    return ADD_Q_TYPE
+
+async def cancel_add_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    block_id = context.user_data.get('target_block_id')
+    context.user_data.pop('target_block_id', None)
+    
+    if block_id:
+        await show_block_detail(query, block_id)
+    else:
+        await admin_panel(update, context)
     return ConversationHandler.END
 
 # -------------------- SAVOLLARNI KO'RISH / TAHRIRLASH / O'CHIRISH --------------------
@@ -719,7 +754,10 @@ def run_bot():
     add_q_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(start_add_question, pattern="^btn_add_q_")],
         states={
-            ADD_Q_TYPE: [CallbackQueryHandler(select_q_type, pattern="^qtype_")],
+            ADD_Q_TYPE: [
+                CallbackQueryHandler(select_q_type, pattern="^qtype_"),
+                CallbackQueryHandler(cancel_add_question, pattern="^cancel_add_q$")
+            ],
             ADD_Q_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_q_text)],
             ADD_Q_A: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_q_a)],
             ADD_Q_B: [MessageHandler(filters.TEXT & ~filters.COMMAND, input_q_b)],
@@ -730,7 +768,7 @@ def run_bot():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, save_question)
             ],
         },
-        fallbacks=[],
+        fallbacks=[CallbackQueryHandler(cancel_add_question, pattern="^cancel_add_q$")],
         per_message=False
     )
 

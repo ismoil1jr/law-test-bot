@@ -140,23 +140,133 @@ async def grant_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
-# -------------------- ADMIN PANEL & STATS --------------------
+# -------------------- ADMIN PANEL & USER MANAGEMENT --------------------
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if query: await query.answer()
 
+    if not is_admin(update.effective_user.id):
+        return
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("➕ Yangi Blok Yaratish", callback_data="btn_auto_add_block")],
         [InlineKeyboardButton("📦 Bloklar va Savollar", callback_data="btn_list_blocks")],
-        [InlineKeyboardButton("📊 Foydalanuvchilar Statistikasi", callback_data="btn_admin_stats")]
+        [InlineKeyboardButton("👥 Foydalanuvchilar Ro'yxati", callback_data="btn_admin_users_0")],
+        [InlineKeyboardButton("📊 Umumiy Statistika", callback_data="btn_admin_stats")]
     ])
     text = "🛠 **Admin Boshqaruv Paneli**"
     if query:
         await query.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
+async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(update.effective_user.id): return
+
+    parts = query.data.split("_")
+    page = int(parts[3]) if len(parts) > 3 else 0
+    per_page = 8
+
+    db = SessionLocal()
+    users = db.query(User).order_by(User.id.desc()).all()
+    total_users = len(users)
+
+    if not users:
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Admin Panel", callback_data="admin_panel")]])
+        await query.message.edit_text("👥 Bazada foydalanuvchilar topilmadi.", reply_markup=kb)
+        db.close()
+        return
+
+    start_idx = page * per_page
+    end_idx = start_idx + per_page
+    page_users = users[start_idx:end_idx]
+
+    buttons = []
+    for u in page_users:
+        name = u.full_name or (f"@{u.username}" if u.username else f"ID: {u.user_id}")
+        buttons.append([InlineKeyboardButton(f"👤 {name} (Imkoniyat: {u.tests_remaining} ta)", callback_data=f"btn_user_detail_{u.user_id}")])
+
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("◀️ Oldingi", callback_data=f"btn_admin_users_{page - 1}"))
+    if end_idx < total_users:
+        nav.append(InlineKeyboardButton("Keyingi ▶️", callback_data=f"btn_admin_users_{page + 1}"))
+
+    if nav: buttons.append(nav)
+    buttons.append([InlineKeyboardButton("⬅️ Admin Panel", callback_data="admin_panel")])
+    db.close()
+
+    text = f"👥 **Foydalanuvchilar ro'yxati** ({start_idx + 1}-{min(end_idx, total_users)} / {total_users}):"
+    await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
+
+async def admin_user_detail(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(update.effective_user.id): return
+
+    user_id = int(query.data.split("_")[-1])
+    db = SessionLocal()
+    user = db.query(User).filter_by(user_id=user_id).first()
+
+    if not user:
+        db.close()
+        await query.message.edit_text("❌ Foydalanuvchi topilmadi!")
+        return
+
+    results = db.query(TestResult).filter_by(user_id=user_id).order_by(TestResult.completed_at.desc()).limit(10).all()
+    db.close()
+
+    res_text = ""
+    if results:
+        for idx, r in enumerate(results, 1):
+            date_str = r.completed_at.strftime("%d.%m.%Y %H:%M") if r.completed_at else "-"
+            res_text += f"\n  {idx}. 📅 {date_str} | **{r.percentage}%** ({r.correct_answers} to'g'ri / {r.wrong_answers} xato)"
+    else:
+        res_text = "\n  *Hali birorta ham test topshirmagan.*"
+
+    text = (
+        f"👤 **Foydalanuvchi Profil:**\n\n"
+        f"🆔 **Telegram ID:** `{user.user_id}`\n"
+        f"📛 **Ism-familiya:** {user.full_name or 'Kiritilmagan'}\n"
+        f"💬 **Username:** @{user.username if user.username else 'yoq'}\n"
+        f"📞 **Telefon:** {user.phone_number or 'Kiritilmagan'}\n"
+        f"📊 **Qolgan imkoniyati:** `{user.tests_remaining}` ta\n\n"
+        f"📝 **Oxirgi test natijalari (Max 10 ta):**{res_text}"
+    )
+
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("➕ 1 ta imkoniyat", callback_data=f"btn_quick_grant_{user.user_id}_1"),
+            InlineKeyboardButton("➕ 5 ta imkoniyat", callback_data=f"btn_quick_grant_{user.user_id}_5")
+        ],
+        [InlineKeyboardButton("⬅️ Foydalanuvchilar ro'yxatiga", callback_data="btn_admin_users_0")]
+    ])
+
+    await query.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+
+async def admin_quick_grant(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(update.effective_user.id): return
+
+    parts = query.data.split("_")
+    user_id = int(parts[3])
+    count = int(parts[4])
+
+    db = SessionLocal()
+    user = db.query(User).filter_by(user_id=user_id).first()
+    if user:
+        user.tests_remaining += count
+        db.commit()
+    db.close()
+
+    await query.answer(f"✅ {count} ta imkoniyat berildi!", show_alert=True)
+    await admin_user_detail(update, context)
+
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    if not is_admin(update.effective_user.id): return
 
     db = SessionLocal()
     total_users = db.query(User).count()
@@ -496,7 +606,6 @@ def init_test():
         if not user or user.tests_remaining <= 0:
             return jsonify({"error": "Sizda test topshirish huquqi qolmagan! Admin bilan bog'laning."}), 403
 
-        # Barcha mavjud bloklardan aralash savollarni yig'amiz
         mcq_questions = db.query(Question).filter_by(q_type='mcq').all()
         open_questions = db.query(Question).filter_by(q_type='open').all()
 
@@ -589,7 +698,7 @@ def finish_test():
         return jsonify({"correct": correct, "wrong": wrong, "percentage": percentage})
     finally:
         db.close()
-        
+
 # -------------------- BOTNI ISHLATISH --------------------
 def run_bot():
     loop = asyncio.new_event_loop()
@@ -642,6 +751,9 @@ def run_bot():
     application.add_handler(CommandHandler('grant', grant_command))
     application.add_handler(CommandHandler('plans', plans_command))
     application.add_handler(CallbackQueryHandler(admin_panel, pattern="^admin_panel$"))
+    application.add_handler(CallbackQueryHandler(admin_users_list, pattern="^btn_admin_users_"))
+    application.add_handler(CallbackQueryHandler(admin_user_detail, pattern="^btn_user_detail_"))
+    application.add_handler(CallbackQueryHandler(admin_quick_grant, pattern="^btn_quick_grant_"))
     application.add_handler(CallbackQueryHandler(admin_stats, pattern="^btn_admin_stats$"))
     application.add_handler(CallbackQueryHandler(auto_add_block, pattern="^btn_auto_add_block$"))
     application.add_handler(CallbackQueryHandler(list_blocks, pattern="^btn_list_blocks$"))
@@ -653,12 +765,10 @@ def run_bot():
     application.run_polling(drop_pending_updates=True, stop_signals=None)
 
 # -------------------- BOT THREAD VA SERVERNI ISHGATUSHIRISH --------------------
-# -------------------- BOT THREAD VA SERVERNI ISHGATUSHIRISH --------------------
 def start_bot_thread():
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
 
-# Flask va Botni parallel ishga tushirish
 start_bot_thread()
 
 if __name__ == '__main__':
